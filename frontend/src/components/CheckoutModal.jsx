@@ -154,22 +154,27 @@ const CheckoutModal = ({ order, isOpen, onClose, onPaymentComplete }) => {
             const element = document.getElementById('printable-receipt');
             if (!element) throw new Error('Receipt element not found');
 
-            // Force hex colors for ALL children to prevent html2canvas oklch crash
-            const allElements = element.querySelectorAll('*');
-            allElements.forEach(el => {
-                const style = window.getComputedStyle(el);
-                if (style.color.includes('oklch')) el.style.color = '#000000';
-                if (style.borderColor.includes('oklch')) el.style.borderColor = '#e5e7eb';
-            });
-
             const canvas = await html2canvas(element, {
                 scale: 2,
                 useCORS: true,
                 backgroundColor: '#ffffff',
                 logging: false,
+                onclone: (clonedDoc) => {
+                    // Fix OKLCH colors in the clone for html2canvas compatibility
+                    const clonedReceipt = clonedDoc.getElementById('printable-receipt');
+                    if (!clonedReceipt) return;
+                    const allElements = clonedReceipt.querySelectorAll('*');
+                    allElements.forEach(el => {
+                        const style = window.getComputedStyle(el);
+                        if (style.color && style.color.includes('oklch')) { el.style.color = '#000000'; }
+                        if (style.backgroundColor && style.backgroundColor.includes('oklch')) { el.style.backgroundColor = '#ffffff'; }
+                        if (style.borderColor && style.borderColor.includes('oklch')) { el.style.borderColor = '#000000'; }
+                        el.style.fontFamily = 'monospace';
+                    });
+                }
             });
 
-            const imgData = canvas.toDataURL('image/png');
+            const imgData = canvas.toDataURL('image/png', 1.0);
             const pdf = new jsPDF({
                 orientation: 'portrait',
                 unit: 'mm',
@@ -181,33 +186,40 @@ const CheckoutModal = ({ order, isOpen, onClose, onPaymentComplete }) => {
             pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
 
             const pdfBlob = pdf.output('blob');
-            const file = new File([pdfBlob], `Receipt-${order.orderNumber}.pdf`, { type: 'application/pdf' });
+            const fileName = `Receipt-${order.orderNumber}.pdf`;
+            const file = new File([pdfBlob], fileName, { type: 'application/pdf' });
 
-            if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
-                await navigator.share({
-                    files: [file],
-                    title: `Receipt - ${order.orderNumber}`,
-                    text: `Bill from ${settings?.restaurant?.name || 'Our Restaurant'}`
-                });
+            const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+
+            if (isMobile && navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+                try {
+                    await navigator.share({
+                        files: [file],
+                        title: `Bill - ${order.orderNumber}`,
+                        text: `Bill from ${settings?.restaurant?.name || 'Our Restaurant'}`
+                    });
+                } catch (shareError) {
+                    if (shareError.name !== 'AbortError') throw shareError;
+                }
             } else {
-                pdf.save(`Receipt-${order.orderNumber}.pdf`);
-                // Use alert to notify about the download since share failed
+                pdf.save(fileName);
                 const phone = customerPhone.replace(/\D/g, '');
                 if (phone && phone.length >= 10) {
-                    handleWhatsAppText();
+                    if (confirm('PDF receipt downloaded. Would you like to send the summary via WhatsApp as well?')) {
+                        handleWhatsAppText();
+                    }
                 } else {
-                    alert('PDF downloaded. Direct sharing is not supported on this device/browser.');
+                    alert('PDF receipt downloaded.');
                 }
             }
         } catch (error) {
             console.error('Receipt Generation failed:', error);
-            // If PDF fails, fall back to WhatsApp text sharing immediately
             const phone = customerPhone.replace(/\D/g, '');
             if (phone && phone.length >= 10) {
-                alert('Sharing failed. Sending bill details via text instead.');
+                alert('Could not share PDF. Sending bill details as text instead.');
                 handleWhatsAppText();
             } else {
-                alert('Could not generate sharing receipt. Please use the Print option.');
+                alert('Failed to generate sharing receipt. Please use the Print option.');
             }
         } finally {
             setIsGenerating(false);
