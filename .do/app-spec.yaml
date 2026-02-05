@@ -18,7 +18,7 @@ services:
       branch: main
       deploy_on_push: true
     source_dir: .
-    dockerfile_path: deploy/Dockerfile
+    dockerfile_path: Dockerfile
     http_port: 80
     instance_count: 1
     instance_size_slug: basic-xxs
