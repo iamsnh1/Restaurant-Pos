@@ -339,33 +339,33 @@ const Analytics = () => {
 
         return (
             <div className="space-y-6">
-                <div className="flex justify-between items-center bg-white/5 p-4 rounded-xl border border-white/10">
+                <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center gap-4 bg-white/5 p-4 rounded-xl border border-white/10">
                     <h3 className="text-xl font-bold text-white">Daily Transaction Log</h3>
-                    <div className="flex items-center gap-4">
-                        <div className="flex items-center gap-3 bg-gray-800 p-2 rounded-lg border border-gray-700">
-                            <Search size={18} className="text-gray-400" />
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                        <div className="flex items-center gap-3 bg-gray-800 p-2 rounded-lg border border-gray-700 flex-1">
+                            <Search size={18} className="text-gray-400 shrink-0" />
                             <input
                                 type="text"
                                 placeholder="Search Order #, Name..."
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
-                                className="bg-transparent text-white border-none outline-none text-sm w-48"
+                                className="bg-transparent text-white border-none outline-none text-sm w-full sm:w-48"
                             />
                         </div>
-                        <div className="flex items-center gap-3 bg-gray-800 p-2 rounded-lg border border-gray-700">
-                            <Calendar size={18} className="text-gray-400" />
+                        <div className="flex items-center gap-3 bg-gray-800 p-2 rounded-lg border border-gray-700 flex-1 sm:flex-initial">
+                            <Calendar size={18} className="text-gray-400 shrink-0" />
                             <input
                                 type="date"
                                 value={historyDate}
                                 onChange={(e) => setHistoryDate(e.target.value)}
-                                className="bg-transparent text-white border-none outline-none text-sm font-mono"
+                                className="bg-transparent text-white border-none outline-none text-sm font-mono w-full"
                             />
                         </div>
                     </div>
                 </div>
 
                 {/* Daily Summary Cards */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
                     <div className="bg-white/5 p-4 rounded-xl border border-white/10">
                         <p className="text-gray-400 text-xs uppercase mb-1">Total Orders</p>
                         <h4 className="text-2xl font-bold">{historyOrders.length}</h4>
@@ -447,20 +447,20 @@ const Analytics = () => {
                                             </td>
                                             <td className="p-4 text-right font-bold">₹{order.total.toFixed(2)}</td>
                                             <td className="p-4 text-center">
-                                                <div className="flex items-center justify-center gap-2">
+                                                <div className="flex items-center justify-center gap-2 sm:gap-3">
                                                     <button
                                                         onClick={() => handleWhatsAppQuick(order)}
-                                                        className="p-2 bg-white/5 hover:bg-green-500/20 rounded-lg text-green-400 hover:text-green-300 transition"
-                                                        title="Send via WhatsApp"
+                                                        className="p-2.5 bg-white/5 hover:bg-green-500/20 rounded-xl text-green-400 hover:text-green-300 transition"
+                                                        title="WhatsApp"
                                                     >
-                                                        <MessageCircle size={18} />
+                                                        <MessageCircle size={20} />
                                                     </button>
                                                     <button
                                                         onClick={() => handleDownloadPdf(order)}
-                                                        className="p-2 bg-white/5 hover:bg-white/10 rounded-lg text-blue-400 hover:text-blue-300 transition"
-                                                        title="View / Print PDF"
+                                                        className="p-2.5 bg-white/5 hover:bg-blue-500/20 rounded-xl text-blue-400 hover:text-blue-300 transition"
+                                                        title="Receipt"
                                                     >
-                                                        <FileText size={18} />
+                                                        <FileText size={20} />
                                                     </button>
                                                 </div>
                                             </td>
@@ -517,30 +517,32 @@ const Analytics = () => {
         <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 text-white">
             {/* Header */}
             <header className="bg-white/5 backdrop-blur-lg border-b border-white/10 sticky top-0 z-10">
-                <div className="px-6 py-4 flex flex-col md:flex-row justify-between items-center gap-4">
-                    <div className="flex items-center gap-4 w-full md:w-auto">
-                        <button onClick={() => navigate('/')} className="hover:bg-white/10 p-2 rounded-lg transition">
-                            <ArrowLeft size={24} />
-                        </button>
-                        <h1 className="text-2xl font-bold">Analytics & Reports</h1>
-                    </div>
-
-                    <div className="flex gap-2 bg-white/5 p-1 rounded-lg">
-                        {['daily', 'weekly', 'monthly'].map((p) => (
-                            <button
-                                key={p}
-                                onClick={() => setPeriod(p)}
-                                className={`px-4 py-2 rounded-md capitalize text-sm font-medium transition ${period === p ? 'bg-purple-600 text-white shadow-lg' : 'text-gray-400 hover:text-white'
-                                    }`}
-                            >
-                                {p}
+                <div className="px-4 sm:px-6 py-4 space-y-4">
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                        <div className="flex items-center gap-3">
+                            <button onClick={() => navigate('/')} className="hover:bg-white/10 p-2 rounded-lg transition mr-1">
+                                <ArrowLeft size={24} />
                             </button>
-                        ))}
+                            <h1 className="text-xl sm:text-2xl font-bold truncate">Analytics & Reports</h1>
+                        </div>
+
+                        <div className="flex gap-2 bg-white/5 p-1 rounded-lg w-full sm:w-auto overflow-x-auto scrollbar-hide">
+                            {['daily', 'weekly', 'monthly'].map((p) => (
+                                <button
+                                    key={p}
+                                    onClick={() => setPeriod(p)}
+                                    className={`flex-1 sm:flex-initial px-4 py-2 rounded-md capitalize text-xs sm:text-sm font-medium transition whitespace-nowrap ${period === p ? 'bg-purple-600 text-white shadow-lg' : 'text-gray-400 hover:text-white'
+                                        }`}
+                                >
+                                    {p}
+                                </button>
+                            ))}
+                        </div>
                     </div>
                 </div>
 
                 {/* Navigation Tabs */}
-                <div className="px-6 flex gap-6 overflow-x-auto border-t border-white/5 mt-2">
+                <div className="px-4 sm:px-6 flex gap-6 overflow-x-auto border-t border-white/5">
                     {[
                         { id: 'sales', label: 'Sales Overview', icon: TrendingUp },
                         { id: 'financials', label: 'Financials', icon: DollarSign },
@@ -562,7 +564,7 @@ const Analytics = () => {
             </header>
 
             {/* Main Content */}
-            <main className="max-w-7xl mx-auto px-6 py-8">
+            <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
                 {activeTab === 'sales' && <SalesTab />}
                 {activeTab === 'financials' && <FinancialTab />}
                 {activeTab === 'history' && <HistoryTab />}
