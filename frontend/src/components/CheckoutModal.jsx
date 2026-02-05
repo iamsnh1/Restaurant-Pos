@@ -22,6 +22,7 @@ const CheckoutModal = ({ order, isOpen, onClose, onPaymentComplete }) => {
     const [customerName, setCustomerName] = useState('');
     const [customerPhone, setCustomerPhone] = useState('');
     const [customerGstin, setCustomerGstin] = useState('');
+    const [isGenerating, setIsGenerating] = useState(false);
 
     useEffect(() => {
         if (isOpen && order) {
@@ -140,6 +141,13 @@ const CheckoutModal = ({ order, isOpen, onClose, onPaymentComplete }) => {
             setProcessing(false);
         }
     };
+
+    const handlePrintAndClose = () => {
+        window.print();
+        onPaymentComplete();
+        onClose();
+    };
+
     const handleShareReceipt = async () => {
         try {
             setIsGenerating(true);
