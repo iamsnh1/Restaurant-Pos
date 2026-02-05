@@ -278,42 +278,35 @@ const CheckoutModal = ({ order, isOpen, onClose, onPaymentComplete }) => {
             pdf.setFont("helvetica", "italic");
             pdf.text("Generated via RestoPOS", mid, y + 2, { align: 'center' });
 
-            // Final Handling
-            const pdfBlob = pdf.output('blob');
+            // 1. Automatic PDF Download (For records/attaching)
             const fileName = `Receipt-${order.orderNumber}.pdf`;
-            const file = new File([pdfBlob], fileName, { type: 'application/pdf' });
+            pdf.save(fileName);
 
-            const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-
-            if (isMobile && navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
-                try {
-                    await navigator.share({
-                        files: [file],
-                        title: `Receipt - ${order.orderNumber}`,
-                        text: `Your bill from ${settings?.restaurant?.name || 'Our Restaurant'}.`
-                    });
-                } catch (e) {
-                    if (e.name !== 'AbortError') throw e;
-                }
-            } else {
-                // Desktop Workflow: Modern and Direct
-                // 1. Download the PDF immediately
-                pdf.save(fileName);
-
-                // 2. Automatically open WhatsApp Chat if phone number exists
-                const phone = customerPhone.replace(/\D/g, '');
-                if (phone && phone.length >= 10) {
-                    handleWhatsAppText();
-                } else {
-                    alert('PDF receipt downloaded. No phone number provided for WhatsApp sharing.');
-                }
-            }
-        } catch (error) {
-            console.error('Manual PDF Generation failed:', error);
+            // 2. Direct WhatsApp Flow to specific number
             const phone = customerPhone.replace(/\D/g, '');
             if (phone && phone.length >= 10) {
-                handleWhatsAppText(); // Try at least text
+                // Ensure 91 prefix for Indian context if only 10 digits
+                const formattedPhone = phone.length === 10 ? `91${phone}` : phone;
+
+                // Construct detailed bill message
+                const restaurantName = settings?.restaurant?.name || 'Our Restaurant';
+                const itemsList = order.items.map(i => `• ${i.quantity}x ${i.menuItem?.name || i.name} - ₹${(i.price * i.quantity).toFixed(0)}`).join('%0A');
+                const message = `*Bill from ${restaurantName}*%0A%0A` +
+                    `*Order:* ${order.orderNumber}%0A` +
+                    `*Items:*%0A${itemsList}%0A%0A` +
+                    `*Total: ₹${billData.grandTotal.toFixed(2)}*%0A%0A` +
+                    `Thank you!`;
+
+                const whatsappUrl = `https://wa.me/${formattedPhone}?text=${message}`;
+
+                // Open WhatsApp directly
+                window.open(whatsappUrl, '_blank');
+            } else {
+                alert('Receipt downloaded. Please enter a 10-digit phone number to share directly on WhatsApp.');
             }
+        } catch (error) {
+            console.error('Direct Share failed:', error);
+            alert('Something went wrong during sharing. Please check if the customer phone number is correct.');
         } finally {
             setIsGenerating(false);
         }
