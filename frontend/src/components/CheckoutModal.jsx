@@ -278,35 +278,47 @@ const CheckoutModal = ({ order, isOpen, onClose, onPaymentComplete }) => {
             pdf.setFont("helvetica", "italic");
             pdf.text("Generated via RestoPOS", mid, y + 2, { align: 'center' });
 
-            // 1. Automatic PDF Download (For records/attaching)
+            // 1. Generate PDF Blob
             const fileName = `Receipt-${order.orderNumber}.pdf`;
-            pdf.save(fileName);
+            const pdfBlob = pdf.output('blob');
+            const file = new File([pdfBlob], fileName, { type: 'application/pdf' });
 
-            // 2. Direct WhatsApp Flow to specific number
-            const phone = customerPhone.replace(/\D/g, '');
-            if (phone && phone.length >= 10) {
-                // Ensure 91 prefix for Indian context if only 10 digits
-                const formattedPhone = phone.length === 10 ? `91${phone}` : phone;
+            // 2. Mobile/Tablet sharing: This allows sending the ACTUAL PDF FILE
+            const canShareFile = navigator.canShare && navigator.canShare({ files: [file] });
 
-                // Construct detailed bill message
-                const restaurantName = settings?.restaurant?.name || 'Our Restaurant';
-                const itemsList = order.items.map(i => `• ${i.quantity}x ${i.menuItem?.name || i.name} - ₹${(i.price * i.quantity).toFixed(0)}`).join('%0A');
-                const message = `*Bill from ${restaurantName}*%0A%0A` +
-                    `*Order:* ${order.orderNumber}%0A` +
-                    `*Items:*%0A${itemsList}%0A%0A` +
-                    `*Total: ₹${billData.grandTotal.toFixed(2)}*%0A%0A` +
-                    `Thank you!`;
-
-                const whatsappUrl = `https://wa.me/${formattedPhone}?text=${message}`;
-
-                // Open WhatsApp directly
-                window.open(whatsappUrl, '_blank');
+            if (canShareFile) {
+                try {
+                    await navigator.share({
+                        files: [file],
+                        title: `Receipt - ${order.orderNumber}`,
+                        text: `Your bill from ${settings?.restaurant?.name || 'Our Restaurant'}.`
+                    });
+                } catch (e) {
+                    if (e.name !== 'AbortError') throw e;
+                }
             } else {
-                alert('Receipt downloaded. Please enter a 10-digit phone number to share directly on WhatsApp.');
+                // Desktop/PC Workflow: Download + WhatsApp Link
+                pdf.save(fileName);
+
+                const phone = customerPhone.replace(/\D/g, '');
+                if (phone && phone.length >= 10) {
+                    const formattedPhone = phone.length === 10 ? `91${phone}` : phone;
+                    const restaurantName = settings?.restaurant?.name || 'Our Restaurant';
+                    const itemsList = order.items.map(i => `• ${i.quantity}x ${i.menuItem?.name || i.name} - ₹${(i.price * i.quantity).toFixed(0)}`).join('%0A');
+                    const message = `*Bill from ${restaurantName}*%0A%0A` +
+                        `*Order:* ${order.orderNumber}%0A` +
+                        `*Items:*%0A${itemsList}%0A%0A` +
+                        `*Total: ₹${billData.grandTotal.toFixed(2)}*%0A%0A` +
+                        `I have also downloaded the PDF bill to this device.`;
+
+                    window.open(`https://wa.me/${formattedPhone}?text=${message}`, '_blank');
+                } else {
+                    alert('PDF Receipt downloaded. Enter a phone number to share summary on WhatsApp.');
+                }
             }
         } catch (error) {
-            console.error('Direct Share failed:', error);
-            alert('Something went wrong during sharing. Please check if the customer phone number is correct.');
+            console.error('Sharing failed:', error);
+            alert('Something went wrong. Please check the customer phone number.');
         } finally {
             setIsGenerating(false);
         }
