@@ -8,6 +8,7 @@ const ReceiptModal = ({ isOpen, onClose, order, settings }) => {
     const [customerName, setCustomerName] = useState('');
     const [customerPhone, setCustomerPhone] = useState('');
     const [customerGstin, setCustomerGstin] = useState('');
+    const [isGenerating, setIsGenerating] = useState(false);
 
     useEffect(() => {
         if (order) {
@@ -31,7 +32,6 @@ const ReceiptModal = ({ isOpen, onClose, order, settings }) => {
         grandTotal: order.total
     };
 
-    const [isGenerating, setIsGenerating] = useState(false);
 
     const handlePrint = () => {
         window.print();
