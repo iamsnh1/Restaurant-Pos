@@ -151,61 +151,154 @@ const CheckoutModal = ({ order, isOpen, onClose, onPaymentComplete }) => {
     const handleShareReceipt = async () => {
         try {
             setIsGenerating(true);
-            const element = document.getElementById('printable-receipt');
-            if (!element) throw new Error('Receipt element not found');
 
-            const canvas = await html2canvas(element, {
-                scale: 2,
-                useCORS: true,
-                backgroundColor: '#ffffff',
-                logging: false,
-                onclone: (clonedDoc) => {
-                    // Fix OKLCH colors in the clone for html2canvas compatibility
-                    const clonedReceipt = clonedDoc.getElementById('printable-receipt');
-                    if (!clonedReceipt) return;
-                    const allElements = clonedReceipt.querySelectorAll('*');
-                    allElements.forEach(el => {
-                        const style = window.getComputedStyle(el);
-                        if (style.color && style.color.includes('oklch')) { el.style.color = '#000000'; }
-                        if (style.backgroundColor && style.backgroundColor.includes('oklch')) { el.style.backgroundColor = '#ffffff'; }
-                        if (style.borderColor && style.borderColor.includes('oklch')) { el.style.borderColor = '#000000'; }
-                        el.style.fontFamily = 'monospace';
-                    });
-                }
-            });
-
-            const imgData = canvas.toDataURL('image/png', 1.0);
+            // Create PDF manually to avoid html2canvas OKLCH color errors
             const pdf = new jsPDF({
                 orientation: 'portrait',
                 unit: 'mm',
-                format: [80, (canvas.height * 80) / canvas.width]
+                format: [80, 250] // POS width, long height
             });
 
-            const pdfWidth = pdf.internal.pageSize.getWidth();
-            const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
-            pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+            let y = 10;
+            const leftMargin = 5;
+            const rightMargin = 75;
+            const mid = 40;
 
+            // Header - Restaurant Name
+            pdf.setFontSize(14);
+            pdf.setFont("helvetica", "bold");
+            const restName = settings?.restaurant?.name || 'Restaurant Name';
+            pdf.text(restName.toUpperCase(), mid, y, { align: 'center' });
+            y += 6;
+
+            // Header - Details
+            pdf.setFontSize(8);
+            pdf.setFont("helvetica", "normal");
+            const address = settings?.restaurant?.address || '';
+            const addrLines = pdf.splitTextToSize(address, 65);
+            addrLines.forEach(line => {
+                pdf.text(line, mid, y, { align: 'center' });
+                y += 4;
+            });
+
+            if (settings?.restaurant?.phone) {
+                pdf.text(`Phone: ${settings.restaurant.phone}`, mid, y, { align: 'center' });
+                y += 4;
+            }
+            if (settings?.restaurant?.gstin) {
+                pdf.text(`GSTIN: ${settings.restaurant.gstin}`, mid, y, { align: 'center' });
+                y += 4;
+            }
+
+            y += 2;
+            pdf.setDrawColor(0);
+            pdf.setLineDash([1, 1], 0);
+            pdf.line(leftMargin, y, rightMargin, y);
+            pdf.setLineDash([]); // Reset dash
+            y += 5;
+
+            // Order Info
+            pdf.setFontSize(9);
+            pdf.text(`Order: ${order.orderNumber}`, leftMargin, y);
+            pdf.text(`Date: ${new Date().toLocaleDateString()}`, rightMargin, y, { align: 'right' });
+            y += 4.5;
+            pdf.text(`Type: ${order.orderType.toUpperCase()}`, leftMargin, y);
+            if (order.tableNumber) pdf.text(`Table: ${order.tableNumber}`, rightMargin, y, { align: 'right' });
+            y += 6;
+
+            // Items Table Header
+            pdf.setFont("helvetica", "bold");
+            pdf.line(leftMargin, y - 4, rightMargin, y - 4);
+            pdf.text("Item", leftMargin, y);
+            pdf.text("Qty", 55, y, { align: 'center' });
+            pdf.text("Total", rightMargin, y, { align: 'right' });
+            y += 4;
+            pdf.line(leftMargin, y, rightMargin, y);
+            y += 6;
+
+            // Items List
+            pdf.setFont("helvetica", "normal");
+            order.items.forEach(item => {
+                const itemName = item.menuItem?.name || item.name;
+                const itemLines = pdf.splitTextToSize(itemName, 48);
+
+                // Print Item Name and first Qty/Total line
+                pdf.text(itemLines[0], leftMargin, y);
+                pdf.text(item.quantity.toString(), 55, y, { align: 'center' });
+                pdf.text((item.price * item.quantity).toFixed(2), rightMargin, y, { align: 'right' });
+                y += 5;
+
+                // Print overflow name lines
+                for (let i = 1; i < itemLines.length; i++) {
+                    pdf.text(itemLines[i], leftMargin, y);
+                    y += 4;
+                }
+            });
+
+            y += 1;
+            pdf.setLineDash([1, 1], 0);
+            pdf.line(leftMargin, y, rightMargin, y);
+            pdf.setLineDash([]);
+            y += 6;
+
+            // Totals
+            pdf.text("Subtotal", leftMargin, y);
+            pdf.text(billData.itemTotal.toFixed(2), rightMargin, y, { align: 'right' });
+            y += 4.5;
+
+            if (billData.discountAmount > 0) {
+                pdf.text("Discount", leftMargin, y);
+                pdf.text("-" + billData.discountAmount.toFixed(2), rightMargin, y, { align: 'right' });
+                y += 4.5;
+            }
+
+            billData.taxDetails?.forEach(tax => {
+                pdf.text(`${tax.name} (${tax.rate}%)`, leftMargin, y);
+                pdf.text(tax.amount.toFixed(2), rightMargin, y, { align: 'right' });
+                y += 4.5;
+            });
+
+            y += 2;
+            pdf.setFontSize(11);
+            pdf.setFont("helvetica", "bold");
+            pdf.text("Grand Total", leftMargin, y);
+            pdf.text(`Rs. ${billData.grandTotal.toFixed(2)}`, rightMargin, y, { align: 'right' });
+            y += 8;
+
+            // Footer
+            pdf.setFontSize(8);
+            pdf.setFont("helvetica", "normal");
+            const footer = settings?.receipt?.footer || 'Thank you for dining with us!';
+            const footerLines = pdf.splitTextToSize(footer, 65);
+            footerLines.forEach(line => {
+                pdf.text(line, mid, y, { align: 'center' });
+                y += 4;
+            });
+
+            pdf.setFont("helvetica", "italic");
+            pdf.text("Generated via RestoPOS", mid, y + 2, { align: 'center' });
+
+            // Final Handling
             const pdfBlob = pdf.output('blob');
             const fileName = `Receipt-${order.orderNumber}.pdf`;
             const file = new File([pdfBlob], fileName, { type: 'application/pdf' });
 
             const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-
             if (isMobile && navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
                 try {
                     await navigator.share({
                         files: [file],
-                        title: `Bill - ${order.orderNumber}`,
-                        text: `Bill from ${settings?.restaurant?.name || 'Our Restaurant'}`
+                        title: `Receipt - ${order.orderNumber}`,
+                        text: `Your bill from ${settings?.restaurant?.name || 'Our Restaurant'}.`
                     });
-                } catch (shareError) {
-                    if (shareError.name !== 'AbortError') throw shareError;
+                } catch (e) {
+                    if (e.name !== 'AbortError') throw e;
                 }
             } else {
                 pdf.save(fileName);
                 const phone = customerPhone.replace(/\D/g, '');
                 if (phone && phone.length >= 10) {
-                    if (confirm('PDF receipt downloaded. Would you like to send the summary via WhatsApp as well?')) {
+                    if (confirm('PDF downloaded. Open WhatsApp to send receipt details?')) {
                         handleWhatsAppText();
                     }
                 } else {
@@ -213,18 +306,13 @@ const CheckoutModal = ({ order, isOpen, onClose, onPaymentComplete }) => {
                 }
             }
         } catch (error) {
-            console.error('Receipt Generation failed:', error);
-            const phone = customerPhone.replace(/\D/g, '');
-            if (phone && phone.length >= 10) {
-                alert('Could not share PDF. Sending bill details as text instead.');
-                handleWhatsAppText();
-            } else {
-                alert('Failed to generate sharing receipt. Please use the Print option.');
-            }
+            console.error('Manual PDF Generation failed:', error);
+            handleWhatsAppText(); // Fallback to text
         } finally {
             setIsGenerating(false);
         }
     };
+
 
     const handleWhatsAppText = () => {
         const phone = customerPhone.replace(/\D/g, '');
