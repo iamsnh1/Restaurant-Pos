@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../services/api';
-import { X, CreditCard, Banknote, Smartphone, SplitSquareVertical, Printer, CheckCircle, MessageCircle, Share2 } from 'lucide-react';
+import { X, CreditCard, Banknote, Smartphone, SplitSquareVertical, Printer, CheckCircle, MessageCircle, Share2, Check } from 'lucide-react';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 
