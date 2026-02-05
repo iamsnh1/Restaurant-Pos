@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import api from '../services/api';
+import api, { API_BASE } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
 import {
@@ -35,7 +35,7 @@ const POSTerminal = () => {
 
     // Socket for notifications
     useEffect(() => {
-        const socket = io('http://localhost:5001');
+        const socket = io(API_BASE);
 
         socket.on('orderStatusUpdate', (updatedOrder) => {
             if (updatedOrder.status === 'ready') {

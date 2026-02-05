@@ -1,6 +1,18 @@
+# Dependencies and build
 node_modules/
-.env
+frontend/node_modules/
+backend/node_modules/
+frontend/dist/
 dist/
+
+# Environment and secrets (never commit)
+.env
+.env.local
+.env.*.local
+backend/.env
+frontend/.env
+
+# OS and editors
 .DS_Store
 *.log
 npm-debug.log*
@@ -9,6 +21,6 @@ yarn-error.log*
 .vscode/
 .idea/
 *.local
-frontend/node_modules/
-backend/node_modules/
-frontend/dist/
+
+# Docker (optional, uncomment if you want to ignore compose overrides)
+# docker-compose.override.yml

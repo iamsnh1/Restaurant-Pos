@@ -197,7 +197,7 @@ const PublicReceipt = () => {
 
                     <div className="text-center text-xs text-slate-400 italic">
                         <p>{settings?.receipt?.footer || 'Thank you for dining with us!'}</p>
-                        <p className="mt-2 text-[10px]">Generated via RestoPOS</p>
+                        <p className="mt-2 text-[10px]">Generated via Voxxera POS</p>
                     </div>
                 </div>
 

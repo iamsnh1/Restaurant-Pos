@@ -1,28 +1,30 @@
 const express = require('express');
 const router = express.Router();
-const Reservation = require('../models/Reservation');
+const { prisma } = require('../config/db');
 const { protect } = require('../middleware/authMiddleware');
 
 // Get all reservations
 router.get('/', protect, async (req, res) => {
     try {
         const { date, status } = req.query;
-        const filter = {};
+        const where = {};
 
         if (date) {
             const startOfDay = new Date(date);
             startOfDay.setHours(0, 0, 0, 0);
             const endOfDay = new Date(date);
             endOfDay.setHours(23, 59, 59, 999);
-            filter.date = { $gte: startOfDay, $lte: endOfDay };
+            where.dateTime = { gte: startOfDay, lte: endOfDay };
         }
 
-        if (status) filter.status = status;
+        if (status) where.status = status;
 
-        const reservations = await Reservation.find(filter)
-            .sort({ date: 1, time: 1 })
-            .populate('createdBy', 'name');
-        res.json(reservations);
+        const reservations = await prisma.reservation.findMany({
+            where,
+            orderBy: { dateTime: 'asc' },
+            include: { table: true }
+        });
+        res.json(reservations.map(r => ({ ...r, _id: r.id })));
     } catch (error) {
         res.status(500).json({ message: error.message });
     }
@@ -31,18 +33,31 @@ router.get('/', protect, async (req, res) => {
 // Create reservation
 router.post('/', protect, async (req, res) => {
     try {
-        const reservation = await Reservation.create({
-            ...req.body,
-            createdBy: req.user._id,
+        // Mongoose had `time` field potentially separate in req.body?
+        // Assuming req.body has `dateTime` or we construct it.
+        // If frontend sends 'date' and 'time', we might need to combine.
+        // But usually standardizing on ISO dateTime is best.
+
+        const reservation = await prisma.reservation.create({
+            data: {
+                customerName: req.body.customerName || req.body.name,
+                customerPhone: req.body.customerPhone || req.body.phone,
+                guests: req.body.guests ? parseInt(req.body.guests) : 2,
+                dateTime: new Date(req.body.dateTime || req.body.date),
+                status: req.body.status || 'confirmed',
+                notes: req.body.notes,
+                tableId: req.body.tableId,
+                // createdBy field missing in simplified schema, ignoring.
+            }
         });
 
         // Emit real-time event
         const io = req.app.get('io');
         if (io) {
-            io.to('pos').emit('newReservation', reservation);
+            io.to('pos').emit('newReservation', { ...reservation, _id: reservation.id });
         }
 
-        res.status(201).json(reservation);
+        res.status(201).json({ ...reservation, _id: reservation.id });
     } catch (error) {
         res.status(400).json({ message: error.message });
     }
@@ -51,22 +66,25 @@ router.post('/', protect, async (req, res) => {
 // Update reservation
 router.put('/:id', protect, async (req, res) => {
     try {
-        const reservation = await Reservation.findByIdAndUpdate(
-            req.params.id,
-            req.body,
-            { new: true }
-        );
-        if (!reservation) {
-            return res.status(404).json({ message: 'Reservation not found' });
-        }
+        const reservation = await prisma.reservation.update({
+            where: { id: req.params.id },
+            data: {
+                ...req.body,
+                guests: req.body.guests ? parseInt(req.body.guests) : undefined, // Parse if present
+                dateTime: req.body.dateTime ? new Date(req.body.dateTime) : undefined
+            }
+        });
 
         const io = req.app.get('io');
         if (io) {
-            io.to('pos').emit('reservationUpdate', reservation);
+            io.to('pos').emit('reservationUpdate', { ...reservation, _id: reservation.id });
         }
 
-        res.json(reservation);
+        res.json({ ...reservation, _id: reservation.id });
     } catch (error) {
+        if (error.code === 'P2025') {
+            return res.status(404).json({ message: 'Reservation not found' });
+        }
         res.status(400).json({ message: error.message });
     }
 });
@@ -74,12 +92,12 @@ router.put('/:id', protect, async (req, res) => {
 // Delete reservation
 router.delete('/:id', protect, async (req, res) => {
     try {
-        const reservation = await Reservation.findByIdAndDelete(req.params.id);
-        if (!reservation) {
-            return res.status(404).json({ message: 'Reservation not found' });
-        }
+        await prisma.reservation.delete({ where: { id: req.params.id } });
         res.json({ message: 'Reservation deleted' });
     } catch (error) {
+        if (error.code === 'P2025') {
+            return res.status(404).json({ message: 'Reservation not found' });
+        }
         res.status(500).json({ message: error.message });
     }
 });
@@ -92,12 +110,15 @@ router.get('/today', protect, async (req, res) => {
         const tomorrow = new Date(today);
         tomorrow.setDate(tomorrow.getDate() + 1);
 
-        const reservations = await Reservation.find({
-            date: { $gte: today, $lt: tomorrow },
-            status: { $nin: ['cancelled', 'no-show'] },
-        }).sort({ time: 1 });
+        const reservations = await prisma.reservation.findMany({
+            where: {
+                dateTime: { gte: today, lt: tomorrow },
+                status: { notIn: ['cancelled', 'no-show'] },
+            },
+            orderBy: { dateTime: 'asc' }
+        });
 
-        res.json(reservations);
+        res.json(reservations.map(r => ({ ...r, _id: r.id })));
     } catch (error) {
         res.status(500).json({ message: error.message });
     }

@@ -1,11 +1,14 @@
-const Category = require('../models/Category');
+const { prisma } = require('../config/db');
 
 // @desc    Get all categories
 // @route   GET /api/categories
 // @access  Public
 const getCategories = async (req, res) => {
     try {
-        const categories = await Category.find({ isActive: true }).sort('order');
+        const categories = await prisma.category.findMany({
+            where: { isActive: true },
+            orderBy: { order: 'asc' },
+        });
         res.json(categories);
     } catch (error) {
         res.status(500).json({ message: error.message });
@@ -18,7 +21,14 @@ const getCategories = async (req, res) => {
 const createCategory = async (req, res) => {
     try {
         const { name, description, image, order } = req.body;
-        const category = await Category.create({ name, description, image, order });
+        const category = await prisma.category.create({
+            data: {
+                name,
+                description,
+                image,
+                order: order ? parseInt(order) : 0,
+            },
+        });
         res.status(201).json(category);
     } catch (error) {
         res.status(400).json({ message: error.message });
@@ -30,14 +40,16 @@ const createCategory = async (req, res) => {
 // @access  Private/Admin
 const updateCategory = async (req, res) => {
     try {
-        const category = await Category.findByIdAndUpdate(req.params.id, req.body, {
-            new: true,
+        const category = await prisma.category.update({
+            where: { id: req.params.id },
+            data: req.body,
         });
-        if (!category) {
-            return res.status(404).json({ message: 'Category not found' });
-        }
         res.json(category);
     } catch (error) {
+        // Handle record not found
+        if (error.code === 'P2025') {
+            return res.status(404).json({ message: 'Category not found' });
+        }
         res.status(400).json({ message: error.message });
     }
 };
@@ -47,12 +59,14 @@ const updateCategory = async (req, res) => {
 // @access  Private/Admin
 const deleteCategory = async (req, res) => {
     try {
-        const category = await Category.findByIdAndDelete(req.params.id);
-        if (!category) {
-            return res.status(404).json({ message: 'Category not found' });
-        }
+        await prisma.category.delete({
+            where: { id: req.params.id },
+        });
         res.json({ message: 'Category removed' });
     } catch (error) {
+        if (error.code === 'P2025') {
+            return res.status(404).json({ message: 'Category not found' });
+        }
         res.status(500).json({ message: error.message });
     }
 };

@@ -1,6 +1,7 @@
 import React from 'react';
 import { useAuth } from '../context/AuthContext';
 import { LogOut, UtensilsCrossed, ClipboardList, LayoutDashboard, BarChart3, Users, Settings, Download, Bell } from 'lucide-react';
+import VoxxeraLogo from '../components/VoxxeraLogo';
 import { Link, useNavigate } from 'react-router-dom';
 
 const Dashboard = () => {
@@ -92,7 +93,7 @@ const Dashboard = () => {
             {/* Header */}
             <header className="bg-white/5 backdrop-blur-lg border-b border-white/10">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-col sm:flex-row justify-between items-center gap-4">
-                    <h1 className="text-2xl font-bold text-white">Restaurant POS</h1>
+                    <VoxxeraLogo variant="compact" />
                     <div className="flex items-center gap-4 w-full sm:w-auto justify-between sm:justify-end">
                         <div className="flex items-center gap-2">
                             {deferredPrompt && (

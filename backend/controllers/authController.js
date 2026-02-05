@@ -1,5 +1,6 @@
-const User = require('../models/User');
+const { prisma } = require('../config/db');
 const generateToken = require('../utils/generateToken');
+const bcrypt = require('bcryptjs');
 
 // @desc    Auth user & get token
 // @route   POST /api/auth/login
@@ -7,15 +8,17 @@ const generateToken = require('../utils/generateToken');
 const authUser = async (req, res) => {
     const { email, password } = req.body;
 
-    const user = await User.findOne({ email });
+    const user = await prisma.user.findUnique({
+        where: { email },
+    });
 
-    if (user && (await user.matchPassword(password))) {
+    if (user && (await bcrypt.compare(password, user.password))) {
         res.json({
-            _id: user._id,
+            _id: user.id, // compatibility
             name: user.name,
             email: user.email,
             role: user.role,
-            token: generateToken(user._id),
+            token: generateToken(user.id),
         });
     } else {
         res.status(401).json({ message: 'Invalid email or password' });
@@ -28,30 +31,68 @@ const authUser = async (req, res) => {
 const registerUser = async (req, res) => {
     const { name, email, password, role } = req.body;
 
-    const userExists = await User.findOne({ email });
+    const userExists = await prisma.user.findUnique({
+        where: { email },
+    });
 
     if (userExists) {
         return res.status(400).json({ message: 'User already exists' });
     }
 
-    const user = await User.create({
-        name,
-        email,
-        password,
-        role,
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
+
+    const user = await prisma.user.create({
+        data: {
+            name,
+            email,
+            password: hashedPassword,
+            role: role || 'waiter',
+        },
     });
 
     if (user) {
         res.status(201).json({
-            _id: user._id,
+            _id: user.id,
             name: user.name,
             email: user.email,
             role: user.role,
-            token: generateToken(user._id),
+            token: generateToken(user.id),
         });
     } else {
         res.status(400).json({ message: 'Invalid user data' });
     }
 };
 
-module.exports = { authUser, registerUser };
+// @desc    One-time setup: create first admin if no users exist
+// @route   POST /api/auth/setup
+// @access  Public (only works when no users in DB)
+const setupFirstUser = async (req, res) => {
+    const { name, email, password } = req.body;
+    const count = await prisma.user.count();
+    if (count > 0) {
+        return res.status(400).json({ message: 'Setup already completed' });
+    }
+    if (!name || !email || !password) {
+        return res.status(400).json({ message: 'Name, email and password required' });
+    }
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
+    const user = await prisma.user.create({
+        data: {
+            name: name || 'Admin',
+            email,
+            password: hashedPassword,
+            role: 'admin',
+        },
+    });
+    res.status(201).json({
+        _id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        token: generateToken(user.id),
+    });
+};
+
+module.exports = { authUser, registerUser, setupFirstUser };

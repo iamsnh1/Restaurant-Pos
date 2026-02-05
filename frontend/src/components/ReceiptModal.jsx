@@ -190,7 +190,7 @@ const ReceiptModal = ({ isOpen, onClose, order, settings }) => {
 
                     <div className="text-center mt-8 text-xs">
                         <p>{receipt.footer || 'Thank you for dining with us!'}</p>
-                        <p className="mt-2 text-gray-400">Powered by POS System</p>
+                        <p className="mt-2 text-gray-400">Powered by Voxxera POS</p>
                     </div>
                 </div>
 

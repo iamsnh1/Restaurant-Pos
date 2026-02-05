@@ -1,4 +1,4 @@
-const MenuItem = require('../models/MenuItem');
+const { prisma } = require('../config/db');
 
 // @desc    Get all menu items
 // @route   GET /api/menu
@@ -6,11 +6,29 @@ const MenuItem = require('../models/MenuItem');
 const getMenuItems = async (req, res) => {
     try {
         const { category } = req.query;
-        const filter = { isAvailable: true };
-        if (category) filter.category = category;
+        // In Prisma, filtering by related ID is specific
+        // Ensure category is passed correctly if filtering
+        const where = { isAvailable: true };
+        if (category) {
+            where.categoryId = category;
+        }
 
-        const items = await MenuItem.find(filter).populate('category', 'name');
-        res.json(items);
+        const items = await prisma.menuItem.findMany({
+            where,
+            include: { category: true },
+        });
+
+        // Transform for frontend if needed? 
+        // Frontend likely expects `category.name` which is available
+        // Mongoose populated returned full category object. Prisma include does too.
+        // We might need to map `id` to `_id`?
+        const mappedItems = items.map(item => ({
+            ...item,
+            _id: item.id,
+            category: { ...item.category, _id: item.category?.id }
+        }));
+
+        res.json(mappedItems);
     } catch (error) {
         res.status(500).json({ message: error.message });
     }
@@ -21,11 +39,14 @@ const getMenuItems = async (req, res) => {
 // @access  Public
 const getMenuItem = async (req, res) => {
     try {
-        const item = await MenuItem.findById(req.params.id).populate('category', 'name');
+        const item = await prisma.menuItem.findUnique({
+            where: { id: req.params.id },
+            include: { category: true },
+        });
         if (!item) {
             return res.status(404).json({ message: 'Menu item not found' });
         }
-        res.json(item);
+        res.json({ ...item, _id: item.id });
     } catch (error) {
         res.status(500).json({ message: error.message });
     }
@@ -36,8 +57,23 @@ const getMenuItem = async (req, res) => {
 // @access  Private/Admin
 const createMenuItem = async (req, res) => {
     try {
-        const item = await MenuItem.create(req.body);
-        res.status(201).json(item);
+        // req.body contains category (ID)
+        // We need to map it to categoryId or connect
+        // Mongoose: category: ObjectId
+        // Prisma: data: { category: { connect: { id: ... } } } OR categoryId: ...
+
+        const { category, ...rest } = req.body;
+
+        const item = await prisma.menuItem.create({
+            data: {
+                ...rest,
+                category: { connect: { id: category } },
+                // Defaults handled by schema
+            },
+            include: { category: true }
+        });
+
+        res.status(201).json({ ...item, _id: item.id });
     } catch (error) {
         res.status(400).json({ message: error.message });
     }
@@ -48,14 +84,28 @@ const createMenuItem = async (req, res) => {
 // @access  Private/Admin
 const updateMenuItem = async (req, res) => {
     try {
-        const item = await MenuItem.findByIdAndUpdate(req.params.id, req.body, {
-            new: true,
+        const { category, ...rest } = req.body;
+        const data = { ...rest };
+
+        if (category) {
+            data.category = { connect: { id: category } }; // Or just set categoryId
+            // If category is string ID, we can do data.categoryId = category
+            // But if it's object, handle it. Assuming string ID from frontend form.
+            // Let's use clean approach:
+            delete data.category;
+            data.categoryId = category;
+        }
+
+        const item = await prisma.menuItem.update({
+            where: { id: req.params.id },
+            data,
+            include: { category: true }
         });
-        if (!item) {
+        res.json({ ...item, _id: item.id });
+    } catch (error) {
+        if (error.code === 'P2025') {
             return res.status(404).json({ message: 'Menu item not found' });
         }
-        res.json(item);
-    } catch (error) {
         res.status(400).json({ message: error.message });
     }
 };
@@ -65,12 +115,14 @@ const updateMenuItem = async (req, res) => {
 // @access  Private/Admin
 const deleteMenuItem = async (req, res) => {
     try {
-        const item = await MenuItem.findByIdAndDelete(req.params.id);
-        if (!item) {
-            return res.status(404).json({ message: 'Menu item not found' });
-        }
+        await prisma.menuItem.delete({
+            where: { id: req.params.id },
+        });
         res.json({ message: 'Menu item removed' });
     } catch (error) {
+        if (error.code === 'P2025') {
+            return res.status(404).json({ message: 'Menu item not found' });
+        }
         res.status(500).json({ message: error.message });
     }
 };

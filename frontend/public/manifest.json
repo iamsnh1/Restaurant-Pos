@@ -1,6 +1,6 @@
 {
-    "name": "Restaurant POS System",
-    "short_name": "RestoPOS",
+    "name": "Voxxera POS System",
+    "short_name": "Voxxera POS",
     "description": "Professional Restaurant Point of Sale System",
     "start_url": "/",
     "display": "standalone",

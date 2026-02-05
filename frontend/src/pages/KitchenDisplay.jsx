@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { io } from 'socket.io-client';
-import api from '../services/api';
+import api, { API_BASE } from '../services/api';
 
 const KitchenDisplay = () => {
     const navigate = useNavigate();
@@ -16,7 +16,7 @@ const KitchenDisplay = () => {
         fetchOrders();
 
         // Setup Socket.io connection
-        socketRef.current = io('http://localhost:5001', {
+        socketRef.current = io(API_BASE, {
             transports: ['websocket', 'polling'],
         });
 

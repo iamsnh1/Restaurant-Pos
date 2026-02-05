@@ -1,7 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const Order = require('../models/Order');
-const Settings = require('../models/Settings');
+const { prisma } = require('../config/db');
 const { protect } = require('../middleware/authMiddleware');
 
 // Calculate Bill (Preview)
@@ -10,16 +9,21 @@ router.post('/calculate', protect, async (req, res) => {
         const { orderId, discountType, discountValue } = req.body;
         console.log(`[Calculate] Request for Order: ${orderId}`);
 
-        const order = await Order.findById(orderId).populate('items.menuItem');
+        const order = await prisma.order.findUnique({
+            where: { id: orderId },
+            include: { items: { include: { menuItem: true } } }
+        });
+
         if (!order) {
             console.log('[Calculate] Order not found');
             return res.status(404).json({ message: 'Order not found' });
         }
         console.log(`[Calculate] Order Found: ${order.orderNumber}, Items: ${order.items.length}`);
 
-        const settings = await Settings.findOne();
+        const settings = await prisma.settings.findFirst();
         console.log(`[Calculate] Settings Found: ${!!settings}`);
-        const taxRates = settings?.financials?.taxRates || [];
+        // Settings structure is { data: { ... } }
+        const taxRates = settings?.data?.financials?.taxRates || [];
 
         // 1. Calculate Item Total
         let itemTotal = 0;
@@ -88,50 +92,63 @@ router.post('/pay', protect, async (req, res) => {
     try {
         const { orderId, paymentMethod, amount, transactionId, isFullPayment, billingDetails, customer } = req.body;
 
-        const order = await Order.findById(orderId);
+        const order = await prisma.order.findUnique({
+            where: { id: orderId },
+            include: { transactions: true } // Need to reduce previous transactions
+        });
+
         if (!order) return res.status(404).json({ message: 'Order not found' });
 
-        // Update Customer Details if provided
+        const updates = { billingDetails }; // Lock in billing details
         if (customer) {
-            order.customer = { ...order.customer, ...customer };
+            updates.customerName = customer.name;
+            updates.customerPhone = customer.phone;
+            updates.customerEmail = customer.email;
+            updates.customerGstin = customer.gstin;
         }
+        updates.total = billingDetails.grandTotal;
 
-        // Update Billing Details if provided (to lock in the calculated values)
-        if (billingDetails) {
-            order.billingDetails = { ...order.billingDetails, ...billingDetails };
-            order.total = billingDetails.grandTotal; // Sync legacy total field
-        }
+        // Determine Payment Status
+        let paymentStatus = order.paymentStatus;
+        // Calculate Totals Paid INCLUDING this new one
+        const previousPaid = order.transactions.reduce((sum, txn) => sum + txn.amount, 0);
+        const totalPaid = previousPaid + amount;
 
-        // Add Transaction
-        const newTransaction = {
-            amount,
-            paymentMethod,
-            transactionId,
-            status: 'success',
-            timestamp: new Date()
-        };
-        order.transactions.push(newTransaction);
-
-        // Update root payment method for easy access/analytics
-        if (!order.paymentMethod) {
-            order.paymentMethod = paymentMethod;
-        } else if (order.paymentMethod !== paymentMethod) {
-            order.paymentMethod = 'split'; // Or handle mixed methods
-        }
-
-        // Calculate Totals Paid
-        const totalPaid = order.transactions.reduce((sum, txn) => sum + txn.amount, 0);
-
-        // Update Status
-        if (totalPaid >= order.billingDetails.grandTotal - 0.5) { // Tolerance for float
-            order.paymentStatus = 'paid';
-            order.status = 'completed'; // Auto-complete order on payment? Usually yes for POS.
+        if (totalPaid >= billingDetails.grandTotal - 0.5) {
+            paymentStatus = 'paid';
+            updates.status = 'completed';
         } else {
-            order.paymentStatus = 'partially_paid';
+            paymentStatus = 'partially_paid';
         }
 
-        await order.save();
-        res.json(order);
+        updates.paymentStatus = paymentStatus;
+
+        // Update root payment method
+        if (!order.paymentMethod) {
+            updates.paymentMethod = paymentMethod;
+        } else if (order.paymentMethod !== paymentMethod) {
+            updates.paymentMethod = 'split';
+        }
+
+        // Perform update with nested transaction creation
+        const updatedOrder = await prisma.order.update({
+            where: { id: orderId },
+            data: {
+                ...updates,
+                transactions: {
+                    create: {
+                        amount,
+                        paymentMethod,
+                        transactionId,
+                        status: 'success',
+                        timestamp: new Date()
+                    }
+                }
+            },
+            include: { transactions: true }
+        });
+
+        res.json({ ...updatedOrder, _id: updatedOrder.id });
 
     } catch (error) {
         res.status(500).json({ message: error.message });
@@ -141,18 +158,22 @@ router.post('/pay', protect, async (req, res) => {
 // Get Invoice Data
 router.get('/:id/invoice', protect, async (req, res) => {
     try {
-        const order = await Order.findById(req.params.id)
-            .populate('items.menuItem')
-            .populate('createdBy', 'name');
+        const order = await prisma.order.findUnique({
+            where: { id: req.params.id },
+            include: {
+                items: { include: { menuItem: true } },
+                createdBy: { select: { name: true } }
+            }
+        });
 
         if (!order) return res.status(404).json({ message: 'Order not found' });
 
-        const settings = await Settings.findOne();
+        const settings = await prisma.settings.findFirst();
 
         res.json({
-            order,
-            restaurant: settings?.restaurant,
-            receiptConfig: settings?.receipt
+            order: { ...order, _id: order.id },
+            restaurant: settings?.data?.restaurant,
+            receiptConfig: settings?.data?.receipt
         });
     } catch (error) {
         res.status(500).json({ message: error.message });

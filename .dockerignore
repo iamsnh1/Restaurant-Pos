@@ -1,0 +1,15 @@
+# Used when building deploy/Dockerfile (context: repo root)
+.git
+.github
+node_modules
+frontend/node_modules
+backend/node_modules
+*.md
+.env
+.env.*
+!.env.example
+frontend/dist
+*.log
+.vscode
+.idea
+.do

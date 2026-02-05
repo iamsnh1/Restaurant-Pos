@@ -1,30 +1,42 @@
 version: '3.8'
 
 services:
-  mongodb:
-    image: mongo:latest
-    ports:
-      - "27017:27017"
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: restaurant-pos
     volumes:
-      - mongodb_data:/data/db
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 3s
+      timeout: 3s
+      retries: 5
 
   backend:
     build: ./backend
-    ports:
-      - "5001:5001"
     environment:
-      - PORT=5001
-      - MONGO_URI=mongodb://mongodb:27017/restaurant-pos
-      - JWT_SECRET=supersecretkey
+      PORT: 5001
+      NODE_ENV: production
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/restaurant-pos?schema=public
+      JWT_SECRET: ${JWT_SECRET:-supersecretkey-change-in-production}
+      FRONTEND_URL: http://localhost
     depends_on:
-      - mongodb
+      postgres:
+        condition: service_healthy
+    # Not exposed to host; only frontend (nginx) talks to backend
 
   frontend:
-    build: ./frontend
+    build:
+      context: ./frontend
+      args:
+        VITE_API_URL: /api
     ports:
       - "80:80"
     depends_on:
       - backend
 
 volumes:
-  mongodb_data:
+  postgres_data:

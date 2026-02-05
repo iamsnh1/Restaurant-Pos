@@ -276,7 +276,7 @@ const CheckoutModal = ({ order, isOpen, onClose, onPaymentComplete }) => {
             });
 
             pdf.setFont("helvetica", "italic");
-            pdf.text("Generated via RestoPOS", mid, y + 2, { align: 'center' });
+            pdf.text("Generated via Voxxera POS", mid, y + 2, { align: 'center' });
 
             // 1. Generate PDF Blob
             const fileName = `Receipt-${order.orderNumber}.pdf`;
@@ -419,7 +419,7 @@ const CheckoutModal = ({ order, isOpen, onClose, onPaymentComplete }) => {
 
                         <div className="text-center mt-8 text-xs border-t-2 border-dashed border-black pt-4" style={{ borderColor: '#000000' }}>
                             <p className="font-bold">{receipt.footer || 'Thank you for dining with us!'}</p>
-                            <p className="mt-2 italic" style={{ color: '#6b7280' }}>Bill generated via RestoPOS</p>
+                            <p className="mt-2 italic" style={{ color: '#6b7280' }}>Bill generated via Voxxera POS</p>
                         </div>
                     </div>
 

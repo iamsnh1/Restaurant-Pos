@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { Lock, Mail, AlertCircle, Loader2 } from 'lucide-react';
+import VoxxeraLogo from '../components/VoxxeraLogo';
 
 const LoginPage = () => {
     const [email, setEmail] = useState('');
@@ -31,7 +32,7 @@ const LoginPage = () => {
             <div className="w-full max-w-md">
                 {/* Logo/Title */}
                 <div className="text-center mb-8">
-                    <h1 className="text-4xl font-bold text-white mb-2">Restaurant POS</h1>
+                    <VoxxeraLogo variant="full" className="mb-2" />
                     <p className="text-purple-300">Sign in to your account</p>
                 </div>
 
@@ -102,7 +103,7 @@ const LoginPage = () => {
 
                 {/* Footer */}
                 <p className="text-center text-purple-300/60 text-sm mt-6">
-                    &copy; 2026 Restaurant POS System
+                    &copy; 2026 Voxxera POS System
                 </p>
             </div>
         </div>
