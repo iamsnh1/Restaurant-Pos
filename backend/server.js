@@ -13,10 +13,37 @@ connectDB();
 const app = express();
 const server = http.createServer(app);
 
+// Production CORS - allow frontend URL from env
+const allowedOrigins = [
+  'http://localhost:5173',
+  'http://localhost:5174',
+  'http://127.0.0.1:5173',
+  'http://127.0.0.1:5174',
+  process.env.FRONTEND_URL
+].filter(Boolean);
+
+// In production, use regex to allow all trycloudflare and vercel domains
+const corsOptions = {
+  origin: process.env.NODE_ENV === 'production'
+    ? (origin, callback) => {
+      if (!origin || allowedOrigins.includes(origin) ||
+        origin.endsWith('.vercel.app') ||
+        origin.endsWith('.trycloudflare.com')) {
+        callback(null, true);
+      } else {
+        callback(null, true); // Allow all in production for now
+      }
+    }
+    : true,
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+};
+
 // Socket.io setup with CORS
 const io = new Server(server, {
   cors: {
-    origin: ['http://localhost:5173', 'http://localhost:5174', 'http://127.0.0.1:5173', 'http://127.0.0.1:5174'],
+    origin: true,
     methods: ['GET', 'POST'],
     credentials: true,
   },
@@ -48,12 +75,7 @@ io.on('connection', (socket) => {
 
 // Middleware
 app.use(express.json());
-app.use(cors({
-  origin: ['http://localhost:5173', 'http://localhost:5174', 'http://127.0.0.1:5173', 'http://127.0.0.1:5174'],
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-}));
+app.use(cors(corsOptions));
 
 // Routes
 app.use('/api/auth', require('./routes/authRoutes'));

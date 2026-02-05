@@ -11,6 +11,7 @@ import AdminDashboard from './pages/AdminDashboard';
 import Analytics from './pages/Analytics';
 import StaffManagement from './pages/StaffManagement';
 import Settings from './pages/Settings';
+import PublicReceipt from './pages/PublicReceipt';
 
 function App() {
   return (
@@ -74,6 +75,7 @@ function App() {
               </ProtectedRoute>
             }
           />
+          <Route path="/receipt/:id" element={<PublicReceipt />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Router>

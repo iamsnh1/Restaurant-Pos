@@ -4,6 +4,16 @@ const Settings = require('../models/Settings');
 const { protect, admin } = require('../middleware/authMiddleware');
 
 // Get Settings (Create default if not exists)
+// Get Public Settings (for digital receipts)
+router.get('/public', async (req, res) => {
+    try {
+        const settings = await Settings.findOne();
+        res.json(settings || {});
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+});
+
 router.get('/', protect, async (req, res) => {
     try {
         let settings = await Settings.findOne();

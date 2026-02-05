@@ -283,37 +283,26 @@ const CheckoutModal = ({ order, isOpen, onClose, onPaymentComplete }) => {
             const pdfBlob = pdf.output('blob');
             const file = new File([pdfBlob], fileName, { type: 'application/pdf' });
 
-            // 2. Intelligence: Mobile phones get File sharing. Desktops get Direct Chat.
-            const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-            const canShareFile = navigator.canShare && navigator.canShare({ files: [file] });
+            // 2. Logic: Send Digital Receipt Link (Option 1)
+            const phone = customerPhone.replace(/\D/g, '');
+            if (phone && phone.length >= 10) {
+                const formattedPhone = phone.length === 10 ? `91${phone}` : phone;
+                const restaurantName = settings?.restaurant?.name || 'Our Restaurant';
 
-            if (isMobile && canShareFile) {
-                try {
-                    await navigator.share({
-                        files: [file],
-                        title: `Receipt - ${order.orderNumber}`,
-                        text: `Your bill from ${settings?.restaurant?.name || 'Our Restaurant'}.`
-                    });
-                } catch (e) {
-                    if (e.name !== 'AbortError') throw e;
-                }
+                // Construct the public receipt link
+                const receiptLink = `${window.location.origin}/receipt/${order._id}`;
+
+                const message = `*Bill from ${restaurantName}*%0A%0A` +
+                    `*Order:* ${order.orderNumber}%0A` +
+                    `*Total: ₹${billData.grandTotal.toFixed(2)}*%0A%0A` +
+                    `View/Download your digital receipt here:%0A${receiptLink}%0A%0A` +
+                    `Thank you for dining with us!`;
+
+                window.open(`https://wa.me/${formattedPhone}?text=${message}`, '_blank');
             } else {
-                // DESKTOP FLOW: Force direct chat + download (Mac/PC browsers are bad at file sharing)
+                // FALLBACK: If no phone number is provided, download the PDF locally
                 pdf.save(fileName);
-                const phone = customerPhone.replace(/\D/g, '');
-                if (phone && phone.length >= 10) {
-                    const formattedPhone = phone.length === 10 ? `91${phone}` : phone;
-                    const itemsList = order.items.map(i => `• ${i.quantity}x ${i.menuItem?.name || i.name} - ₹${(i.price * i.quantity).toFixed(0)}`).join('%0A');
-                    const message = `*Bill from ${settings?.restaurant?.name || 'Our Restaurant'}*%0A%0A` +
-                        `*Order:* ${order.orderNumber}%0A` +
-                        `*Items:*%0A${itemsList}%0A%0A` +
-                        `*Total: ₹${billData.grandTotal.toFixed(2)}*%0A%0A` +
-                        `I have also downloaded the PDF bill for your records.`;
-
-                    window.open(`https://wa.me/${formattedPhone}?text=${message}`, '_blank');
-                } else {
-                    alert('PDF downloaded. Entry a phone number to share summary on WhatsApp.');
-                }
+                alert('No phone number entered. Digital receipt link unavailable. PDF downloaded instead.');
             }
         } catch (error) {
             console.error('Sharing failed:', error);

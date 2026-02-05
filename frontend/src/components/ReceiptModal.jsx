@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, Printer, MessageCircle, Share2, Check } from 'lucide-react';
 import { jsPDF } from 'jspdf';
-import html2canvas from 'html2canvas';
 
 const ReceiptModal = ({ isOpen, onClose, order, settings }) => {
     // Editable state for the modal view (won't save back to DB for now, just for print)
@@ -38,143 +37,24 @@ const ReceiptModal = ({ isOpen, onClose, order, settings }) => {
     };
 
     const handleSharePDF = async () => {
-        try {
-            setIsGenerating(true);
-
-            // Create PDF manually to avoid html2canvas OKLCH color errors
-            const pdf = new jsPDF({
-                orientation: 'portrait',
-                unit: 'mm',
-                format: [80, 250] // POS width
-            });
-
-            let y = 10;
-            const mid = 40;
-            const leftMargin = 5;
-            const rightMargin = 75;
-
-            // Header
-            pdf.setFontSize(14);
-            pdf.setFont("helvetica", "bold");
-            pdf.text((restaurant.name || 'Restaurant').toUpperCase(), mid, y, { align: 'center' });
-            y += 6;
-
-            pdf.setFontSize(8);
-            pdf.setFont("helvetica", "normal");
-            if (restaurant.address) {
-                const addrLines = pdf.splitTextToSize(restaurant.address, 65);
-                addrLines.forEach(l => { pdf.text(l, mid, y, { align: 'center' }); y += 4; });
-            }
-            if (restaurant.phone) { pdf.text(`Phone: ${restaurant.phone}`, mid, y, { align: 'center' }); y += 4; }
-            if (restaurant.gstin) { pdf.text(`GSTIN: ${restaurant.gstin}`, mid, y, { align: 'center' }); y += 4; }
-
-            y += 2;
-            pdf.setLineDash([1, 1], 0);
-            pdf.line(leftMargin, y, rightMargin, y);
-            pdf.setLineDash([]);
-            y += 6;
-
-            // Order Info
-            pdf.setFontSize(9);
-            pdf.text(`Order: ${order.orderNumber}`, leftMargin, y);
-            pdf.text(`Date: ${new Date(order.createdAt).toLocaleDateString()}`, rightMargin, y, { align: 'right' });
-            y += 4.5;
-            pdf.text(`Type: ${(order.orderType || 'dine-in').toUpperCase()}`, leftMargin, y);
-            if (order.tableNumber) pdf.text(`Table: ${order.tableNumber}`, rightMargin, y, { align: 'right' });
-            y += 6;
-
-            // Items Table
-            pdf.setFont("helvetica", "bold");
-            pdf.line(leftMargin, y - 4, rightMargin, y - 4);
-            pdf.text("Item", leftMargin, y);
-            pdf.text("Qty", 55, y, { align: 'center' });
-            pdf.text("Total", rightMargin, y, { align: 'right' });
-            y += 4;
-            pdf.line(leftMargin, y, rightMargin, y);
-            y += 6;
-
-            pdf.setFont("helvetica", "normal");
-            order.items.forEach(item => {
-                const name = item.menuItem?.name || item.name;
-                const lines = pdf.splitTextToSize(name, 48);
-                pdf.text(lines[0], leftMargin, y);
-                pdf.text(item.quantity.toString(), 55, y, { align: 'center' });
-                pdf.text((item.price * item.quantity).toFixed(2), rightMargin, y, { align: 'right' });
-                y += 5;
-                for (let i = 1; i < lines.length; i++) { pdf.text(lines[i], leftMargin, y); y += 4; }
-            });
-
-            y += 1;
-            pdf.setLineDash([1, 1], 0);
-            pdf.line(leftMargin, y, rightMargin, y);
-            pdf.setLineDash([]);
-            y += 6;
-
-            // Totals
-            pdf.text("Subtotal", leftMargin, y);
-            pdf.text(billData.itemTotal.toFixed(2), rightMargin, y, { align: 'right' });
-            y += 4.5;
-            if (billData.discountAmount > 0) {
-                pdf.text("Discount", leftMargin, y);
-                pdf.text("-" + billData.discountAmount.toFixed(2), rightMargin, y, { align: 'right' });
-                y += 4.5;
-            }
-            if (billData.taxDetails?.length > 0) {
-                billData.taxDetails.forEach(t => {
-                    pdf.text(`${t.name} (${t.rate}%)`, leftMargin, y);
-                    pdf.text(t.amount.toFixed(2), rightMargin, y, { align: 'right' });
-                    y += 4.5;
-                });
-            } else if (order.tax > 0) {
-                pdf.text("Tax", leftMargin, y);
-                pdf.text(order.tax.toFixed(2), rightMargin, y, { align: 'right' });
-                y += 4.5;
-            }
-
-            y += 2;
-            pdf.setFontSize(11);
-            pdf.setFont("helvetica", "bold");
-            pdf.text("Grand Total", leftMargin, y);
-            pdf.text(`Rs. ${billData.grandTotal.toFixed(2)}`, rightMargin, y, { align: 'right' });
-            y += 8;
-
-            // Footer
-            pdf.setFontSize(8);
-            pdf.setFont("helvetica", "normal");
-            const footerTxt = receipt.footer || 'Thank you for dining with us!';
-            pdf.splitTextToSize(footerTxt, 65).forEach(l => { pdf.text(l, mid, y, { align: 'center' }); y += 4; });
-            pdf.setFont("helvetica", "italic");
-            pdf.text("Generated via RestoPOS", mid, y + 2, { align: 'center' });
-
-            // Sharing / Saving
-            const pdfBlob = pdf.output('blob');
-            const fileName = `Receipt-${order.orderNumber}.pdf`;
-            const file = new File([pdfBlob], fileName, { type: 'application/pdf' });
-
-            // Intelligence: Mobile phones get File sharing. Desktops get Direct Chat.
-            const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-            const canShareFile = navigator.canShare && navigator.canShare({ files: [file] });
-
-            if (isMobile && canShareFile) {
-                try {
-                    await navigator.share({
-                        files: [file],
-                        title: `Receipt - ${order.orderNumber}`,
-                        text: `Bill from ${restaurant.name || 'Our Restaurant'}`
-                    });
-                } catch (e) { if (e.name !== 'AbortError') throw e; }
-            } else {
-                pdf.save(fileName);
-                const phone = customerPhone.replace(/\D/g, '');
-                if (phone && phone.length >= 10) {
-                    handleWhatsAppText();
-                } else alert('Receipt PDF downloaded.');
-            }
-        } catch (error) {
-            console.error('Sharing failed:', error);
+        const phone = customerPhone.replace(/\D/g, '');
+        if (phone && phone.length >= 10) {
             handleWhatsAppText();
-        } finally {
-            setIsGenerating(false);
+        } else {
+            // Manual fallback for merchants without a phone number
+            try {
+                setIsGenerating(true);
+                const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: [80, 250] });
+                pdf.setFontSize(14);
+                pdf.text((restaurant.name || 'Restaurant').toUpperCase(), 40, 15, { align: 'center' });
+                pdf.setFontSize(10);
+                pdf.text("Order: " + order.orderNumber, 40, 25, { align: 'center' });
+                pdf.save(`Receipt-${order.orderNumber}.pdf`);
+            } catch (err) {
+                console.error(err);
+            } finally {
+                setIsGenerating(false);
+            }
         }
     };
 
@@ -186,13 +66,15 @@ const ReceiptModal = ({ isOpen, onClose, order, settings }) => {
         }
 
         const restaurantName = restaurant.name || 'Our Restaurant';
-        const itemsList = order.items.map(i => `• ${i.quantity}x ${i.menuItem?.name || i.name} - ₹${(i.price * i.quantity).toFixed(0)}`).join('%0A');
         const formattedPhone = phone.length === 10 ? `91${phone}` : phone;
+
+        // Option 1: Digital Receipt Link
+        const receiptLink = `${window.location.origin}/receipt/${order._id}`;
 
         const message = `*Bill from ${restaurantName}*%0A%0A` +
             `*Order:* ${order.orderNumber}%0A` +
-            `*Items:*%0A${itemsList}%0A%0A` +
             `*Total: ₹${billData.grandTotal.toFixed(2)}*%0A%0A` +
+            `You can view/download your digital receipt here:%0A${receiptLink}%0A%0A` +
             `Thank you!`;
 
         window.open(`https://wa.me/${formattedPhone}?text=${message}`, '_blank');
