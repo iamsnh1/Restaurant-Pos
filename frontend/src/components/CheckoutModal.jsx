@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import api from '../services/api';
 import { X, CreditCard, Banknote, Smartphone, SplitSquareVertical, Printer, CheckCircle, MessageCircle, Share2, Check } from 'lucide-react';
-import jsPDF from 'jspdf';
+import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
 
 const CheckoutModal = ({ order, isOpen, onClose, onPaymentComplete }) => {
@@ -152,29 +152,34 @@ const CheckoutModal = ({ order, isOpen, onClose, onPaymentComplete }) => {
         try {
             setIsGenerating(true);
             const element = document.getElementById('printable-receipt');
+            if (!element) throw new Error('Receipt element not found');
 
-            // Temporary style fix for oklch colors in html2canvas
-            const originalStyle = element.style.cssText;
-            element.style.color = '#000000';
-            element.style.backgroundColor = '#ffffff';
+            // Force hex colors for ALL children to prevent html2canvas oklch crash
+            const allElements = element.querySelectorAll('*');
+            allElements.forEach(el => {
+                const style = window.getComputedStyle(el);
+                if (style.color.includes('oklch')) el.style.color = '#000000';
+                if (style.borderColor.includes('oklch')) el.style.borderColor = '#e5e7eb';
+            });
 
             const canvas = await html2canvas(element, {
                 scale: 2,
                 useCORS: true,
-                backgroundColor: '#ffffff'
+                backgroundColor: '#ffffff',
+                logging: false,
             });
-
-            element.style.cssText = originalStyle;
 
             const imgData = canvas.toDataURL('image/png');
             const pdf = new jsPDF({
                 orientation: 'portrait',
                 unit: 'mm',
-                format: [80, canvas.height * 80 / canvas.width]
+                format: [80, (canvas.height * 80) / canvas.width]
             });
+
             const pdfWidth = pdf.internal.pageSize.getWidth();
             const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
             pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+
             const pdfBlob = pdf.output('blob');
             const file = new File([pdfBlob], `Receipt-${order.orderNumber}.pdf`, { type: 'application/pdf' });
 
@@ -182,22 +187,28 @@ const CheckoutModal = ({ order, isOpen, onClose, onPaymentComplete }) => {
                 await navigator.share({
                     files: [file],
                     title: `Receipt - ${order.orderNumber}`,
-                    text: `Bill from ${settings?.restaurant?.name || 'Our Restaurant'}. Support: ${settings?.restaurant?.phone || ''}`
+                    text: `Bill from ${settings?.restaurant?.name || 'Our Restaurant'}`
                 });
             } else {
-                pdf.save(`Bill-${order.orderNumber}.pdf`);
-                // Fallback to WhatsApp text if file share fails
+                pdf.save(`Receipt-${order.orderNumber}.pdf`);
+                // Use alert to notify about the download since share failed
                 const phone = customerPhone.replace(/\D/g, '');
                 if (phone && phone.length >= 10) {
                     handleWhatsAppText();
                 } else {
-                    alert('PDF downloaded. System sharing not supported on this browser.');
+                    alert('PDF downloaded. Direct sharing is not supported on this device/browser.');
                 }
             }
         } catch (error) {
-            console.error('Receipt Generation failed', error);
-            alert('Failed to generate sharing receipt. Downloading PDF instead.');
-            handleWhatsAppText(); // At least share text
+            console.error('Receipt Generation failed:', error);
+            // If PDF fails, fall back to WhatsApp text sharing immediately
+            const phone = customerPhone.replace(/\D/g, '');
+            if (phone && phone.length >= 10) {
+                alert('Sharing failed. Sending bill details via text instead.');
+                handleWhatsAppText();
+            } else {
+                alert('Could not generate sharing receipt. Please use the Print option.');
+            }
         } finally {
             setIsGenerating(false);
         }
@@ -239,18 +250,18 @@ const CheckoutModal = ({ order, isOpen, onClose, onPaymentComplete }) => {
                     </div>
 
                     {/* Scrollable Receipt Area */}
-                    <div className="flex-1 overflow-y-auto p-4 sm:p-8 font-mono text-sm print:p-0" id="printable-receipt" style={{ color: '#000', backgroundColor: '#fff' }}>
+                    <div className="flex-1 overflow-y-auto p-4 sm:p-8 font-mono text-sm print:p-0" id="printable-receipt" style={{ color: '#000000', backgroundColor: '#ffffff' }}>
                         {/* Restaurant Header */}
                         <div className="text-center mb-6">
-                            <h1 className="text-xl sm:text-2xl font-bold uppercase mb-2">{restaurant.name || 'Restaurant Name'}</h1>
-                            {restaurant.address && <p className="whitespace-pre-line text-xs">{restaurant.address}</p>}
-                            {restaurant.phone && <p className="text-xs">Phone: {restaurant.phone}</p>}
-                            {restaurant.gstin && <p className="font-bold mt-1 text-xs">GSTIN: {restaurant.gstin}</p>}
-                            <div className="border-b-2 border-dashed border-black my-4"></div>
+                            <h1 className="text-xl sm:text-2xl font-bold uppercase mb-2" style={{ color: '#000000' }}>{restaurant.name || 'Restaurant Name'}</h1>
+                            {restaurant.address && <p className="whitespace-pre-line text-xs" style={{ color: '#374151' }}>{restaurant.address}</p>}
+                            {restaurant.phone && <p className="text-xs" style={{ color: '#374151' }}>Phone: {restaurant.phone}</p>}
+                            {restaurant.gstin && <p className="font-bold mt-1 text-xs" style={{ color: '#000000' }}>GSTIN: {restaurant.gstin}</p>}
+                            <div className="border-b-2 border-dashed border-black my-4" style={{ borderColor: '#000000' }}></div>
                         </div>
 
                         {/* Order Info */}
-                        <div className="mb-4 flex justify-between text-xs sm:text-sm">
+                        <div className="mb-4 flex justify-between text-xs sm:text-sm" style={{ color: '#000000' }}>
                             <div>
                                 <p>Order No: {order?.orderNumber}</p>
                                 <p>Date: {new Date().toLocaleDateString()}</p>
@@ -262,9 +273,9 @@ const CheckoutModal = ({ order, isOpen, onClose, onPaymentComplete }) => {
                         </div>
 
                         {/* Items Table */}
-                        <table className="w-full mb-4 text-xs sm:text-sm">
+                        <table className="w-full mb-4 text-xs sm:text-sm" style={{ color: '#000000' }}>
                             <thead>
-                                <tr className="border-b border-black">
+                                <tr className="border-b border-black" style={{ borderColor: '#000000' }}>
                                     <th className="text-left py-1">Item</th>
                                     <th className="text-center w-10">Qty</th>
                                     <th className="text-right w-16">Total</th>
@@ -272,7 +283,7 @@ const CheckoutModal = ({ order, isOpen, onClose, onPaymentComplete }) => {
                             </thead>
                             <tbody>
                                 {order?.items?.map((item, idx) => (
-                                    <tr key={idx} className="border-b border-gray-100 last:border-0">
+                                    <tr key={idx} className="border-b" style={{ borderColor: '#f3f4f6' }}>
                                         <td className="py-1.5 leading-tight">{item.menuItem?.name || item.name}</td>
                                         <td className="text-center">{item.quantity}</td>
                                         <td className="text-right">{(item.price * item.quantity).toFixed(2)}</td>
@@ -281,35 +292,35 @@ const CheckoutModal = ({ order, isOpen, onClose, onPaymentComplete }) => {
                             </tbody>
                         </table>
 
-                        <div className="border-b-2 border-dashed border-black mb-4"></div>
+                        <div className="border-b-2 border-dashed border-black mb-4" style={{ borderColor: '#000000' }}></div>
 
                         {/* Totals */}
-                        <div className="space-y-1 text-xs sm:text-sm">
+                        <div className="space-y-1 text-xs sm:text-sm" style={{ color: '#000000' }}>
                             <div className="flex justify-between font-medium">
                                 <span>Subtotal</span>
                                 <span>{billData?.itemTotal?.toFixed(2)}</span>
                             </div>
                             {billData?.discountAmount > 0 && (
-                                <div className="flex justify-between text-green-700">
+                                <div className="flex justify-between" style={{ color: '#15803d' }}>
                                     <span>Discount</span>
                                     <span>-{billData?.discountAmount?.toFixed(2)}</span>
                                 </div>
                             )}
                             {billData?.taxDetails?.map((tax, i) => (
-                                <div key={i} className="flex justify-between text-gray-600">
+                                <div key={i} className="flex justify-between" style={{ color: '#4b5563' }}>
                                     <span>{tax.name} ({tax.rate}%)</span>
                                     <span>{tax.amount.toFixed(2)}</span>
                                 </div>
                             ))}
-                            <div className="border-t border-black pt-2 mt-2 flex justify-between font-bold text-base sm:text-lg">
+                            <div className="border-t border-black pt-2 mt-2 flex justify-between font-bold text-base sm:text-lg" style={{ borderColor: '#000000' }}>
                                 <span>Grand Total</span>
                                 <span>₹{billData?.grandTotal?.toFixed(2)}</span>
                             </div>
                         </div>
 
-                        <div className="text-center mt-8 text-xs border-t-2 border-dashed border-black pt-4">
+                        <div className="text-center mt-8 text-xs border-t-2 border-dashed border-black pt-4" style={{ borderColor: '#000000' }}>
                             <p className="font-bold">{receipt.footer || 'Thank you for dining with us!'}</p>
-                            <p className="mt-2 text-gray-500 italic">Bill generated via RestoPOS</p>
+                            <p className="mt-2 italic" style={{ color: '#6b7280' }}>Bill generated via RestoPOS</p>
                         </div>
                     </div>
 
