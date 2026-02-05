@@ -283,10 +283,11 @@ const CheckoutModal = ({ order, isOpen, onClose, onPaymentComplete }) => {
             const pdfBlob = pdf.output('blob');
             const file = new File([pdfBlob], fileName, { type: 'application/pdf' });
 
-            // 2. Mobile/Tablet sharing: This allows sending the ACTUAL PDF FILE
+            // 2. Intelligence: Mobile phones get File sharing. Desktops get Direct Chat.
+            const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
             const canShareFile = navigator.canShare && navigator.canShare({ files: [file] });
 
-            if (canShareFile) {
+            if (isMobile && canShareFile) {
                 try {
                     await navigator.share({
                         files: [file],
@@ -297,23 +298,21 @@ const CheckoutModal = ({ order, isOpen, onClose, onPaymentComplete }) => {
                     if (e.name !== 'AbortError') throw e;
                 }
             } else {
-                // Desktop/PC Workflow: Download + WhatsApp Link
+                // DESKTOP FLOW: Force direct chat + download (Mac/PC browsers are bad at file sharing)
                 pdf.save(fileName);
-
                 const phone = customerPhone.replace(/\D/g, '');
                 if (phone && phone.length >= 10) {
                     const formattedPhone = phone.length === 10 ? `91${phone}` : phone;
-                    const restaurantName = settings?.restaurant?.name || 'Our Restaurant';
                     const itemsList = order.items.map(i => `• ${i.quantity}x ${i.menuItem?.name || i.name} - ₹${(i.price * i.quantity).toFixed(0)}`).join('%0A');
-                    const message = `*Bill from ${restaurantName}*%0A%0A` +
+                    const message = `*Bill from ${settings?.restaurant?.name || 'Our Restaurant'}*%0A%0A` +
                         `*Order:* ${order.orderNumber}%0A` +
                         `*Items:*%0A${itemsList}%0A%0A` +
                         `*Total: ₹${billData.grandTotal.toFixed(2)}*%0A%0A` +
-                        `I have also downloaded the PDF bill to this device.`;
+                        `I have also downloaded the PDF bill for your records.`;
 
                     window.open(`https://wa.me/${formattedPhone}?text=${message}`, '_blank');
                 } else {
-                    alert('PDF Receipt downloaded. Enter a phone number to share summary on WhatsApp.');
+                    alert('PDF downloaded. Entry a phone number to share summary on WhatsApp.');
                 }
             }
         } catch (error) {

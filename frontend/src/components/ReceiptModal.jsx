@@ -151,7 +151,11 @@ const ReceiptModal = ({ isOpen, onClose, order, settings }) => {
             const fileName = `Receipt-${order.orderNumber}.pdf`;
             const file = new File([pdfBlob], fileName, { type: 'application/pdf' });
 
-            if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+            // Intelligence: Mobile phones get File sharing. Desktops get Direct Chat.
+            const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+            const canShareFile = navigator.canShare && navigator.canShare({ files: [file] });
+
+            if (isMobile && canShareFile) {
                 try {
                     await navigator.share({
                         files: [file],
@@ -164,7 +168,7 @@ const ReceiptModal = ({ isOpen, onClose, order, settings }) => {
                 const phone = customerPhone.replace(/\D/g, '');
                 if (phone && phone.length >= 10) {
                     handleWhatsAppText();
-                } else alert('PDF downloaded.');
+                } else alert('Receipt PDF downloaded.');
             }
         } catch (error) {
             console.error('Sharing failed:', error);
