@@ -284,6 +284,7 @@ const CheckoutModal = ({ order, isOpen, onClose, onPaymentComplete }) => {
             const file = new File([pdfBlob], fileName, { type: 'application/pdf' });
 
             const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+
             if (isMobile && navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
                 try {
                     await navigator.share({
@@ -295,19 +296,24 @@ const CheckoutModal = ({ order, isOpen, onClose, onPaymentComplete }) => {
                     if (e.name !== 'AbortError') throw e;
                 }
             } else {
+                // Desktop Workflow: Modern and Direct
+                // 1. Download the PDF immediately
                 pdf.save(fileName);
+
+                // 2. Automatically open WhatsApp Chat if phone number exists
                 const phone = customerPhone.replace(/\D/g, '');
                 if (phone && phone.length >= 10) {
-                    if (confirm('PDF downloaded. Open WhatsApp to send receipt details?')) {
-                        handleWhatsAppText();
-                    }
+                    handleWhatsAppText();
                 } else {
-                    alert('PDF receipt downloaded.');
+                    alert('PDF receipt downloaded. No phone number provided for WhatsApp sharing.');
                 }
             }
         } catch (error) {
             console.error('Manual PDF Generation failed:', error);
-            handleWhatsAppText(); // Fallback to text
+            const phone = customerPhone.replace(/\D/g, '');
+            if (phone && phone.length >= 10) {
+                handleWhatsAppText(); // Try at least text
+            }
         } finally {
             setIsGenerating(false);
         }
