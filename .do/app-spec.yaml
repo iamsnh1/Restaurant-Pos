@@ -41,7 +41,8 @@ services:
     instance_size_slug: basic-xs
     envs:
       - key: VITE_API_URL
-        value: ${backend.PUBLIC_URL}/api
+        value: /api
+        scope: BUILD_TIME
 
 databases:
   - name: posdb
