@@ -136,10 +136,13 @@ For auto-deploy on push, you also need:
 - ✅ Spaces Access Keys (for file storage - separate from API token)
 
 **Current Status:**
-- ✅ Token authenticated
-- ⚠️ Account shows as "locked" - may need to resolve
-- ❓ Token scopes unknown (check in Control Panel)
-- ❓ GitHub integration status unknown
+- ✅ Token authenticated with **FULL ACCESS** (read + write scopes)
+- ✅ Token created: 6 minutes ago
+- ✅ Token expires: in 3 months
+- ✅ GitHub integration: **WORKING** (auto-deploy triggered on push)
+- ✅ App Platform access: Confirmed
+- ✅ Database access: Confirmed
+- ⚠️ Account shows as "locked" but API calls work fine
 
 ## Next Steps
 
