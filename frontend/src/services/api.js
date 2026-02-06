@@ -2,24 +2,42 @@
 // Production: Use relative path /api (works with same origin)
 // Development: Use localhost or detect from window.location
 const getApiUrl = () => {
-  // If explicitly set via env var, use it
-  if (import.meta.env.VITE_API_URL) {
-    return import.meta.env.VITE_API_URL;
-  }
-  
-  // In browser, detect from current location
-  if (typeof window !== 'undefined') {
-    const origin = window.location.origin;
-    // If running on same origin (production), use relative path
-    if (origin.includes('localhost') || origin.includes('127.0.0.1')) {
-      return 'http://localhost:5001/api';
+    const isLocal = typeof window !== 'undefined' &&
+        (window.location.hostname === 'localhost' ||
+            window.location.hostname === '127.0.0.1' ||
+            window.location.hostname.startsWith('192.168.') ||
+            window.location.hostname.endsWith('.local'));
+
+    // 1. Strongly prioritize the VITE_API_URL provided by the host (Railway/Render)
+    if (import.meta.env.VITE_API_URL && !import.meta.env.VITE_API_URL.includes('/undefined')) {
+        return import.meta.env.VITE_API_URL;
     }
-    // Otherwise use same origin (works for port forwarding and public hosting)
-    return `${origin}/api`;
-  }
-  
-  // Fallback for SSR
-  return 'http://localhost:5001/api';
+
+    // 2. Detection Logic
+    if (typeof window !== 'undefined') {
+        const origin = window.location.origin;
+
+        // ONLY use localhost URLs if we are actually ON a local address
+        if (isLocal) {
+            return 'http://localhost:5001/api';
+        }
+
+        // Domain Change Safety Reset
+        const lastOrigin = localStorage.getItem('last_pos_origin');
+        if (lastOrigin && lastOrigin !== origin) {
+            localStorage.clear(); // Complete clear to prevent cross-domain session issues
+            localStorage.setItem('last_pos_origin', origin);
+            window.location.reload();
+        } else {
+            localStorage.setItem('last_pos_origin', origin);
+        }
+
+        // 3. Fallback for Cloud (e.g. Vercel)
+        // We use relative path /api. The Browser will never trigger "Local Network" prompt for relative paths.
+        return `${origin}/api`;
+    }
+
+    return '/api'; // Safe default for SSR/Build time
 };
 
 export const API_URL = getApiUrl();
