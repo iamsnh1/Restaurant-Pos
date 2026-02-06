@@ -8,8 +8,10 @@ const cors = require('cors');
 const connectDB = require('./config/db');
 const { prisma } = require('./config/db');
 
-// Connect to database
-connectDB();
+// Connect to database (Non-blocking for cloud health checks)
+connectDB().catch(err => {
+  console.error('[CLOUD WARNING] Initial DB connection failed, will retry in background:', err.message);
+});
 
 const app = express();
 app.set('trust proxy', true);

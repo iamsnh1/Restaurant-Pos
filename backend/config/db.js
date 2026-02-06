@@ -20,7 +20,7 @@ const connectDB = async () => {
     console.log('MongoDB Connected via Prisma');
   } catch (error) {
     console.error(`Database connection error: ${error.message}`);
-    process.exit(1);
+    // Do not exit process, let the server stay alive for health checks
   }
 };
 
