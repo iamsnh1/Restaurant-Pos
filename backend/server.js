@@ -57,9 +57,21 @@ io.on('connection', (socket) => {
   });
 });
 
-// Middleware
+// 1. First, apply the CORS middleware
 app.use(cors(corsOptions));
-app.options('(.*)', cors(corsOptions)); // Handle preflight requests for Express 5.x
+
+// 2. Add a Manual Preflight Handler (Fixes Express 5.x PathErrors and CORS blocks)
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(200);
+  }
+  next();
+});
+
 app.use(express.json({ limit: '10mb' }));
 
 // Routes
