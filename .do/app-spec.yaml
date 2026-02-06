@@ -1,5 +1,6 @@
 name: voxxera-pos
 region: nyc
+
 services:
   - name: backend
     github:
@@ -27,8 +28,6 @@ services:
       - key: FRONTEND_URL
         value: ${frontend.PUBLIC_URL}
         type: SECRET
-    routes:
-      - path: /api
 
   - name: frontend
     github:
@@ -43,11 +42,22 @@ services:
     envs:
       - key: VITE_API_URL
         value: ${backend.PUBLIC_URL}/api
-    routes:
-      - path: /
 
 databases:
   - name: posdb
     engine: PG
     version: "15"
     production: false
+
+ingress:
+  rules:
+    - component:
+        name: backend
+      match:
+        path:
+          prefix: /api
+    - component:
+        name: frontend
+      match:
+        path:
+          prefix: /
