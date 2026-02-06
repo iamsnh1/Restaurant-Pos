@@ -102,48 +102,26 @@ export const syncCachedData = async () => {
   }
 
   try {
-    // Sync menu items
-    const cachedMenu = await offlineStorage.getAll(STORES.MENU_ITEMS);
-    if (cachedMenu.length > 0) {
-      try {
-        const serverMenu = await api.getMenuItems();
-        await offlineStorage.save(STORES.MENU_ITEMS, serverMenu);
-      } catch (error) {
-        console.error('[OfflineSync] Error syncing menu:', error);
-      }
-    }
+    console.log('[OfflineSync] Syncing data in parallel for speed...');
 
-    // Sync categories
-    const cachedCategories = await offlineStorage.getAll(STORES.CATEGORIES);
-    if (cachedCategories.length > 0) {
-      try {
-        const serverCategories = await api.getCategories();
-        await offlineStorage.save(STORES.CATEGORIES, serverCategories);
-      } catch (error) {
-        console.error('[OfflineSync] Error syncing categories:', error);
-      }
-    }
+    // Perform all cloud fetches at once instead of one-by-one to save time
+    const results = await Promise.allSettled([
+      api.getMenuItems().then(data => offlineStorage.save(STORES.MENU_ITEMS, data)),
+      api.getCategories().then(data => offlineStorage.save(STORES.CATEGORIES, data)),
+      api.getTables().then(data => offlineStorage.save(STORES.TABLES, data)),
+      api.getSettings().then(data => offlineStorage.save(STORES.SETTINGS, { ...data, id: 'default' }))
+    ]);
 
-    // Sync tables
-    const cachedTables = await offlineStorage.getAll(STORES.TABLES);
-    if (cachedTables.length > 0) {
-      try {
-        const serverTables = await api.getTables();
-        await offlineStorage.save(STORES.TABLES, serverTables);
-      } catch (error) {
-        console.error('[OfflineSync] Error syncing tables:', error);
+    results.forEach((result, index) => {
+      if (result.status === 'rejected') {
+        const types = ['Menu', 'Categories', 'Tables', 'Settings'];
+        console.warn(`[OfflineSync] Fast-Sync partial failure for ${types[index]}:`, result.reason);
       }
-    }
+    });
 
-    // Sync settings
-    try {
-      const serverSettings = await api.getSettings();
-      await offlineStorage.save(STORES.SETTINGS, { ...serverSettings, id: 'default' });
-    } catch (error) {
-      console.error('[OfflineSync] Error syncing settings:', error);
-    }
+    console.log('[OfflineSync] All cloud data updated successfully.');
   } catch (error) {
-    console.error('[OfflineSync] Error syncing cached data:', error);
+    console.error('[OfflineSync] Error during parallel sync:', error);
   }
 };
 
