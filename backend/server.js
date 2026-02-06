@@ -58,8 +58,9 @@ io.on('connection', (socket) => {
 });
 
 // Middleware
-app.use(express.json({ limit: '10mb' }));
 app.use(cors(corsOptions));
+app.options('*', cors(corsOptions)); // Handle preflight requests
+app.use(express.json({ limit: '10mb' }));
 
 // Routes
 app.use('/api/auth', require('./routes/authRoutes'));
