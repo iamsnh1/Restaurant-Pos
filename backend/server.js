@@ -17,8 +17,8 @@ const server = http.createServer(app);
 // CORS - Allow all origins for public access
 // In production, you may want to restrict this to specific domains
 const corsOptions = {
-  origin: true, // Allow all origins for public access
-  credentials: true,
+  origin: '*', // Allow all origins explicitly for cloud deployment
+  credentials: false, // Must be false when origin is '*'
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
 };
@@ -26,9 +26,9 @@ const corsOptions = {
 // Socket.io setup with CORS
 const io = new Server(server, {
   cors: {
-    origin: true,
+    origin: '*',
     methods: ['GET', 'POST'],
-    credentials: true,
+    credentials: false,
   },
 });
 
