@@ -8,11 +8,21 @@ if (!connectionString) {
     process.exit(1);
 }
 
-// DigitalOcean managed DB often requires SSL; URL may include ?sslmode=require
+// Configure SSL based on connection string
+// Local Docker PostgreSQL doesn't support SSL, so disable it for localhost/postgres connections
 const poolConfig = { connectionString };
-if (process.env.NODE_ENV === 'production' && !connectionString.includes('sslmode=')) {
-    poolConfig.ssl = { rejectUnauthorized: true };
+const isLocalDB = connectionString.includes('localhost') || 
+                  connectionString.includes('127.0.0.1') || 
+                  connectionString.includes('postgres:5432') ||
+                  connectionString.includes('@postgres:');
+
+if (!isLocalDB) {
+    // For remote databases (DigitalOcean, Railway, etc.), use SSL if not already specified
+    if (!connectionString.includes('sslmode=')) {
+        poolConfig.ssl = { rejectUnauthorized: true };
+    }
 }
+// For local DB, no SSL config needed (default is no SSL)
 const pool = new Pool(poolConfig);
 const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });
