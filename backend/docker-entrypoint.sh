@@ -9,7 +9,7 @@ fi
 echo "Waiting for PostgreSQL and running migrations..."
 retries=0
 max_retries=30
-until npx prisma db push --accept-data-loss; do
+until npx prisma db push --accept-data-loss --schema=./prisma/schema.prisma; do
   retries=$((retries + 1))
   if [ "$retries" -ge "$max_retries" ]; then
     echo "ERROR: Could not connect to database after $max_retries attempts"
