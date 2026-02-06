@@ -1,15 +1,56 @@
-# Used when building deploy/Dockerfile (context: repo root)
+# Git
 .git
 .github
+.gitignore
+
+# Dependencies
 node_modules
-frontend/node_modules
-backend/node_modules
-*.md
+npm-debug.log
+yarn-error.log
+
+# Build outputs
+dist
+build
+.next
+out
+
+# Environment
 .env
-.env.*
-!.env.example
-frontend/dist
-*.log
+.env.local
+.env.*.local
+*.env
+
+# IDE
 .vscode
 .idea
-.do
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs
+
+# Docker
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# Documentation
+*.md
+docs/
+README*
+
+# Deployment
+.do/
+deploy/
+railway.json
+render.yaml
+
+# Legacy
+.legacy_models/
+*.legacy

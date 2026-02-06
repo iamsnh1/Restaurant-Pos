@@ -135,6 +135,45 @@ Use **App Platform** (managed) or a **Droplet** (VPS). **Full guide:** [docs/DEP
 
 ---
 
+## Deploy Everything Together (Recommended)
+
+**Want everything in one deployment?** Use Railway or Render - they deploy your entire app (frontend + backend + database) from a single Docker container.
+
+### Option 1: Railway (Easiest) ⭐
+
+**One deployment, everything works.** See [RAILWAY-DEPLOY.md](RAILWAY-DEPLOY.md) for full guide.
+
+**Quick steps:**
+1. Go to [railway.app](https://railway.app) → New Project → Deploy from GitHub
+2. Select `iamsnh1/Restaurant-Pos`
+3. Add PostgreSQL database (click "+ New" → Database → PostgreSQL)
+4. Set env vars: `JWT_SECRET` (generate: `openssl rand -base64 32`), `PORT=5001`, `NODE_ENV=production`
+5. Railway auto-deploys your `Dockerfile` (frontend + backend in one container)
+6. Get your URL: `https://your-app.railway.app`
+7. Create first admin: `POST https://your-app.railway.app/api/auth/setup` with `{"name":"Admin","email":"admin@restaurant.com","password":"admin123"}`
+
+**That's it!** Everything runs in one container. No separate deployments.
+
+### Option 2: Render
+
+**One blueprint file, everything deployed.** See [RENDER-DEPLOY.md](RENDER-DEPLOY.md) for full guide.
+
+**Quick steps:**
+1. Go to [render.com](https://render.com) → New → Blueprint
+2. Connect GitHub repo `iamsnh1/Restaurant-Pos`
+3. Render uses `render.yaml` to deploy everything
+4. Get your URL and create first admin
+
+---
+
+## Deploy frontend on Netlify (Separate Deployment)
+
+**Note:** Netlify only hosts static sites, so you'd need to deploy backend separately. **Not recommended** - use Railway or Render instead for single deployment.
+
+If you still want Netlify: See [docs/DEPLOY-NETLIFY.md](docs/DEPLOY-NETLIFY.md) for guide.
+
+---
+
 ## Deploy frontend on Vercel
 
 The **frontend** (Voxxera POS UI) can be deployed on Vercel. The **backend** (Node + Express + Socket.io + PostgreSQL) must run elsewhere (e.g. Railway, Render) because Vercel is for static/serverless, not long‑running servers or WebSockets.

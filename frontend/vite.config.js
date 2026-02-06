@@ -7,5 +7,18 @@ export default defineConfig({
   server: {
     host: true,
     allowedHosts: true
+  },
+  build: {
+    // Optimize build for lower memory usage
+    chunkSizeWarningLimit: 1000,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'react-vendor': ['react', 'react-dom', 'react-router-dom'],
+          'chart-vendor': ['recharts'],
+          'pdf-vendor': ['jspdf', 'html2canvas']
+        }
+      }
+    }
   }
 })

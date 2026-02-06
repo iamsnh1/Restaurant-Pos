@@ -22,13 +22,17 @@ const allowedOrigins = [
   process.env.FRONTEND_URL
 ].filter(Boolean);
 
-// In production, use regex to allow all trycloudflare and vercel domains
+// In production, use regex to allow common hosting domains
 const corsOptions = {
   origin: process.env.NODE_ENV === 'production'
     ? (origin, callback) => {
       if (!origin || allowedOrigins.includes(origin) ||
         origin.endsWith('.vercel.app') ||
-        origin.endsWith('.trycloudflare.com')) {
+        origin.endsWith('.netlify.app') ||
+        origin.endsWith('.trycloudflare.com') ||
+        origin.endsWith('.railway.app') ||
+        origin.endsWith('.render.com') ||
+        origin.endsWith('.fly.dev')) {
         callback(null, true);
       } else {
         callback(null, true); // Allow all in production for now
