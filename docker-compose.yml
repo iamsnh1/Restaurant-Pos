@@ -31,7 +31,6 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-        required: false  # Optional - only needed if using local PostgreSQL
     # Not exposed to host; only frontend (nginx) talks to backend
 
   frontend:
