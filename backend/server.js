@@ -74,6 +74,31 @@ app.use((req, res, next) => {
 
 app.use(express.json({ limit: '10mb' }));
 
+const { prisma } = require('./config/db');
+
+// Health Check & Diagnostics
+app.get('/api/health', async (req, res) => {
+  try {
+    const userCount = await prisma.user.count();
+    res.json({
+      status: 'OK',
+      database: 'Connected',
+      userCount,
+      env: {
+        node: process.version,
+        env: process.env.NODE_ENV,
+        hasDbUrl: !!process.env.DATABASE_URL
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: 'Error',
+      message: error.message,
+      stack: process.env.NODE_ENV === 'production' ? '🥞' : error.stack
+    });
+  }
+});
+
 // Routes
 app.use('/api/auth', require('./routes/authRoutes'));
 app.use('/api/categories', require('./routes/categoryRoutes'));
@@ -87,7 +112,16 @@ app.use('/api/settings', require('./routes/settingsRoutes'));
 app.use('/api/billing', require('./routes/billingRoutes'));
 
 app.get('/', (req, res) => {
-  res.send('API is running...');
+  res.send('API is running (v2 with Diagnostics)...');
+});
+
+// Global Error Handler
+app.use((err, req, res, next) => {
+  console.error('[CRITICAL ERROR]', err);
+  res.status(500).json({
+    message: 'Internal Server Error',
+    error: err.message
+  });
 });
 
 const PORT = process.env.PORT || 5001;
