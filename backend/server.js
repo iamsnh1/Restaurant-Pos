@@ -59,7 +59,7 @@ io.on('connection', (socket) => {
 
 // Middleware
 app.use(cors(corsOptions));
-app.options('*', cors(corsOptions)); // Handle preflight requests
+app.options('(.*)', cors(corsOptions)); // Handle preflight requests for Express 5.x
 app.use(express.json({ limit: '10mb' }));
 
 // Routes
