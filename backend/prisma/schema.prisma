@@ -3,11 +3,12 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
 }
 
 model User {
-  id          String    @id @default(cuid())
+  id          String    @id @default(cuid()) @map("_id")
   name        String
   email       String    @unique
   password    String
@@ -33,7 +34,7 @@ enum Role {
 }
 
 model Category {
-  id          String    @id @default(cuid())
+  id          String    @id @default(cuid()) @map("_id")
   name        String
   description String?
   image       String?
@@ -45,7 +46,7 @@ model Category {
 }
 
 model MenuItem {
-  id              String    @id @default(cuid())
+  id              String    @id @default(cuid()) @map("_id")
   name            String
   description     String?
   price           Float
@@ -56,7 +57,7 @@ model MenuItem {
   isAvailable     Boolean   @default(true)
   preparationTime Int       @default(15) // in minutes
   variants        Json?
-  allergens       String[]
+  allergens       Json?  // Stored as JSON array: ["peanuts", "dairy"]
   nutritionalInfo Json?
   costPrice       Float     @default(0)
   createdAt       DateTime  @default(now())
@@ -65,7 +66,7 @@ model MenuItem {
 }
 
 model Order {
-  id              String      @id @default(cuid())
+  id              String      @id @default(cuid()) @map("_id")
   orderNumber     String      @unique
   orderType       OrderType   @default(dine_in)
   tableNumber     Int?
@@ -121,7 +122,7 @@ enum PaymentStatus {
 }
 
 model OrderItem {
-  id                  String    @id @default(cuid())
+  id                  String    @id @default(cuid()) @map("_id")
   orderId             String
   order               Order     @relation(fields: [orderId], references: [id])
   menuItemId          String
@@ -135,7 +136,7 @@ model OrderItem {
 }
 
 model Transaction {
-  id            String    @id @default(cuid())
+  id            String    @id @default(cuid()) @map("_id")
   orderId       String
   order         Order     @relation(fields: [orderId], references: [id])
   amount        Float
@@ -147,7 +148,7 @@ model Transaction {
 }
 
 model Table {
-  id        String   @id @default(cuid())
+  id        String   @id @default(cuid()) @map("_id")
   number    Int      @unique
   capacity  Int      @default(4)
   status    String   @default("available") // available, occupied, reserved
@@ -158,7 +159,7 @@ model Table {
 }
 
 model Settings {
-  id        String   @id @default(cuid()) 
+  id        String   @id @default(cuid()) @map("_id") 
   // Storing settings as specific fields or JSON
   restaurantName    String?
   restaurantAddress String?
@@ -172,7 +173,7 @@ model Settings {
 }
 
 model Attendance {
-  id          String    @id @default(cuid())
+  id          String    @id @default(cuid()) @map("_id")
   userId      String
   user        User      @relation(fields: [userId], references: [id])
   date        DateTime
@@ -185,7 +186,7 @@ model Attendance {
 }
 
 model Shift {
-  id        String   @id @default(cuid())
+  id        String   @id @default(cuid()) @map("_id")
   userId    String
   user      User     @relation(fields: [userId], references: [id])
   startTime DateTime
@@ -196,7 +197,7 @@ model Shift {
 }
 
 model Reservation {
-  id            String   @id @default(cuid())
+  id            String   @id @default(cuid()) @map("_id")
   customerName  String
   customerPhone String
   tableId       String?

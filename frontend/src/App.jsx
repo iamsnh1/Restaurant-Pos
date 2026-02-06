@@ -1,7 +1,9 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
+import InstallPrompt from './components/InstallPrompt';
+import OfflineIndicator from './components/OfflineIndicator';
 import LoginPage from './pages/LoginPage';
 import Dashboard from './pages/Dashboard';
 import POSTerminal from './pages/POSTerminal';
@@ -12,10 +14,22 @@ import Analytics from './pages/Analytics';
 import StaffManagement from './pages/StaffManagement';
 import Settings from './pages/Settings';
 import PublicReceipt from './pages/PublicReceipt';
+import { initOfflineSync } from './services/offlineSync';
+import { initDB } from './services/offlineStorage';
 
 function App() {
+  useEffect(() => {
+    // Initialize offline storage and sync
+    initDB().then(() => {
+      console.log('[App] IndexedDB initialized');
+    });
+    initOfflineSync();
+  }, []);
+
   return (
     <AuthProvider>
+      <OfflineIndicator />
+      <InstallPrompt />
       <Router>
         <Routes>
           <Route path="/login" element={<LoginPage />} />

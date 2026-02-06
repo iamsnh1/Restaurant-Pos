@@ -21,7 +21,7 @@ router.post('/calculate', protect, async (req, res) => {
         console.log(`[Calculate] Order Found: ${order.orderNumber}, Items: ${order.items.length}`);
 
         const settings = await prisma.settings.findFirst();
-        console.log(`[Calculate] Settings Found: ${!!settings}`);
+        console.log(`[Calculate] Settings Found: ${!!settings}, ID: ${settings?.id}`);
         // Settings structure is { data: { ... } }
         const taxRates = settings?.data?.financials?.taxRates || [];
 
@@ -152,6 +152,7 @@ router.post('/pay', protect, async (req, res) => {
             include: { transactions: true }
         });
 
+        console.log(`[Payment] Processed status: ${paymentStatus}, Total Paid now: ${totalPaid}/${billingDetails.grandTotal}`);
         res.json({ ...updatedOrder, _id: updatedOrder.id });
 
     } catch (error) {
@@ -163,8 +164,11 @@ router.post('/pay', protect, async (req, res) => {
 router.post('/receipt-pdf', protect, async (req, res) => {
     try {
         const { orderId, pdfBase64, fileName } = req.body;
-        
+        console.log(`[Receipt PDF] Request keys: ${Object.keys(req.body).join(', ')}`);
+        console.log(`[Receipt PDF] Uploading for Order: ${orderId}, Filename: ${fileName}, Size: ${pdfBase64 ? pdfBase64.length : 'MISSING'}`);
+
         if (!orderId || !pdfBase64) {
+            console.error('[Receipt PDF] Validation failed: Missing orderId or pdfBase64');
             return res.status(400).json({ message: 'Order ID and PDF data required' });
         }
 
@@ -176,11 +180,8 @@ router.post('/receipt-pdf', protect, async (req, res) => {
 
         const existingBilling = order?.billingDetails || {};
         // Use FRONTEND_URL if available (for production), otherwise construct from request
-        const baseUrl = process.env.FRONTEND_URL 
-            ? process.env.FRONTEND_URL.replace(/\/$/, '')
-            : `${req.protocol}://${req.get('host')}`;
-        const pdfUrl = `${baseUrl}/api/billing/receipt/${orderId}/pdf`;
-        
+        const pdfUrl = `/api/billing/receipt/${orderId}/pdf`;
+
         // Store PDF base64 in order's billingDetails (temporary - in production use file storage like S3)
         await prisma.order.update({
             where: { id: orderId },
@@ -204,19 +205,23 @@ router.post('/receipt-pdf', protect, async (req, res) => {
 router.get('/receipt/:orderId/pdf', async (req, res) => {
     try {
         const { orderId } = req.params;
+        console.log(`[PDF Download] Request for Order: ${orderId}`);
         const order = await prisma.order.findUnique({
             where: { id: orderId },
             select: { billingDetails: true, orderNumber: true }
         });
 
         if (!order) {
+            console.error(`[PDF Download] Order not found: ${orderId}`);
             return res.status(404).json({ message: 'Order not found' });
         }
 
         const pdfBase64 = order.billingDetails?.pdfBase64;
         if (!pdfBase64) {
+            console.error(`[PDF Download] PDF data missing for Order: ${orderId}`);
             return res.status(404).json({ message: 'PDF not found for this order' });
         }
+        console.log(`[PDF Download] Serving PDF for Order: ${orderId}, Size: ${pdfBase64.length}`);
 
         const pdfBuffer = Buffer.from(pdfBase64, 'base64');
         const fileName = order.billingDetails?.pdfFileName || `Bill-${order.orderNumber}.pdf`;

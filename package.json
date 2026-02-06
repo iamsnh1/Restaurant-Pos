@@ -1,0 +1,11 @@
+{
+  "name": "restaurant-pos",
+  "version": "1.0.0",
+  "description": "Restaurant POS System",
+  "scripts": {
+    "build": "cd frontend && npm install && npm run build"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

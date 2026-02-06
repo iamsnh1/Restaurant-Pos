@@ -1,4 +1,28 @@
-export const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
+// Auto-detect API URL based on environment
+// Production: Use relative path /api (works with same origin)
+// Development: Use localhost or detect from window.location
+const getApiUrl = () => {
+  // If explicitly set via env var, use it
+  if (import.meta.env.VITE_API_URL) {
+    return import.meta.env.VITE_API_URL;
+  }
+  
+  // In browser, detect from current location
+  if (typeof window !== 'undefined') {
+    const origin = window.location.origin;
+    // If running on same origin (production), use relative path
+    if (origin.includes('localhost') || origin.includes('127.0.0.1')) {
+      return 'http://localhost:5001/api';
+    }
+    // Otherwise use same origin (works for port forwarding and public hosting)
+    return `${origin}/api`;
+  }
+  
+  // Fallback for SSR
+  return 'http://localhost:5001/api';
+};
+
+export const API_URL = getApiUrl();
 const API_BASE = API_URL.replace(/\/api\/?$/, '') || (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:5001');
 export { API_BASE };
 
@@ -34,68 +58,77 @@ const api = {
 
     // Staff
     getStaff: async () => {
-        const res = await safeFetch(`${API_URL}/staff`, { headers: getAuthHeader() });
+        const headers = getAuthHeader();
+        const res = await safeFetch(`${API_URL}/staff`, { headers });
         return res.json();
     },
 
     createStaff: async (data) => {
+        const headers = getAuthHeader();
         const res = await safeFetch(`${API_URL}/staff`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
+            headers: { 'Content-Type': 'application/json', ...headers },
             body: JSON.stringify(data),
         });
         return res.json();
     },
 
     updateStaff: async (id, data) => {
+        const headers = getAuthHeader();
         const res = await safeFetch(`${API_URL}/staff/${id}`, {
             method: 'PUT',
-            headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
+            headers: { 'Content-Type': 'application/json', ...headers },
             body: JSON.stringify(data),
         });
         return res.json();
     },
 
     deleteStaff: async (id) => {
+        const headers = getAuthHeader();
         const res = await safeFetch(`${API_URL}/staff/${id}`, {
             method: 'DELETE',
-            headers: getAuthHeader(),
+            headers,
         });
         return res.json();
     },
 
     // Attendance
     clockIn: async () => {
+        const headers = getAuthHeader();
         const res = await safeFetch(`${API_URL}/staff/attendance/clock-in`, {
             method: 'POST',
-            headers: getAuthHeader(),
+            headers,
         });
         return res.json();
     },
 
     clockOut: async () => {
+        const headers = getAuthHeader();
         const res = await safeFetch(`${API_URL}/staff/attendance/clock-out`, {
             method: 'POST',
-            headers: getAuthHeader(),
+            headers,
         });
         return res.json();
     },
 
     getAttendance: async () => {
-        const res = await safeFetch(`${API_URL}/staff/attendance`, { headers: getAuthHeader() });
+        const headers = getAuthHeader();
+        const res = await safeFetch(`${API_URL}/staff/attendance`, { headers });
         return res.json();
     },
 
     // Shifts
     getShifts: async () => {
-        const res = await safeFetch(`${API_URL}/staff/shifts`, { headers: getAuthHeader() });
+        const headers = getAuthHeader();
+        const res = await safeFetch(`${API_URL}/staff/shifts`, { headers });
         return res.json();
     },
 
     createShift: async (data) => {
+        const headers = getAuthHeader();
         const res = await safeFetch(`${API_URL}/staff/shifts`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
+            headers: { 'Content-Type': 'application/json', ...headers },
             body: JSON.stringify(data),
         });
         return res.json();
@@ -117,36 +150,40 @@ const api = {
     },
 
     createMenuItem: async (data) => {
+        const headers = getAuthHeader();
         const res = await safeFetch(`${API_URL}/menu`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
+            headers: { 'Content-Type': 'application/json', ...headers },
             body: JSON.stringify(data),
         });
         return res.json();
     },
 
     updateMenuItem: async (id, data) => {
+        const headers = getAuthHeader();
         const res = await safeFetch(`${API_URL}/menu/${id}`, {
             method: 'PUT',
-            headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
+            headers: { 'Content-Type': 'application/json', ...headers },
             body: JSON.stringify(data),
         });
         return res.json();
     },
 
     deleteMenuItem: async (id) => {
+        const headers = getAuthHeader();
         const res = await safeFetch(`${API_URL}/menu/${id}`, {
             method: 'DELETE',
-            headers: getAuthHeader(),
+            headers,
         });
         return res.json();
     },
 
     // Categories CRUD
     createCategory: async (data) => {
+        const headers = getAuthHeader();
         const res = await safeFetch(`${API_URL}/categories`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
+            headers: { 'Content-Type': 'application/json', ...headers },
             body: JSON.stringify(data),
         });
         return res.json();
@@ -155,42 +192,47 @@ const api = {
     // Orders
     getOrders: async (filters = {}) => {
         const params = new URLSearchParams(filters).toString();
+        const headers = getAuthHeader();
         const res = await safeFetch(`${API_URL}/orders?${params}`, {
-            headers: getAuthHeader(),
+            headers,
         });
         return res.json();
     },
 
     createOrder: async (data) => {
+        const headers = getAuthHeader();
         const res = await safeFetch(`${API_URL}/orders`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
+            headers: { 'Content-Type': 'application/json', ...headers },
             body: JSON.stringify(data),
         });
         return res.json();
     },
 
     updateOrderStatus: async (id, status) => {
+        const headers = getAuthHeader();
         const res = await safeFetch(`${API_URL}/orders/${id}/status`, {
             method: 'PUT',
-            headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
+            headers: { 'Content-Type': 'application/json', ...headers },
             body: JSON.stringify({ status }),
         });
         return res.json();
     },
 
     updatePayment: async (id, paymentData) => {
+        const headers = getAuthHeader();
         const res = await safeFetch(`${API_URL}/orders/${id}/payment`, {
             method: 'PUT',
-            headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
+            headers: { 'Content-Type': 'application/json', ...headers },
             body: JSON.stringify(paymentData),
         });
         return res.json();
     },
 
     getKitchenOrders: async () => {
+        const headers = getAuthHeader();
         const res = await safeFetch(`${API_URL}/orders/kitchen`, {
-            headers: getAuthHeader(),
+            headers,
         });
         const data = await res.json();
         if (!res.ok) {
@@ -201,23 +243,26 @@ const api = {
 
     // Tables
     getTables: async () => {
-        const res = await safeFetch(`${API_URL}/tables`, { headers: getAuthHeader() });
+        const headers = getAuthHeader();
+        const res = await safeFetch(`${API_URL}/tables`, { headers });
         return res.json();
     },
 
     updateTableStatus: async (id, data) => {
+        const headers = getAuthHeader();
         const res = await safeFetch(`${API_URL}/tables/${id}`, {
             method: 'PUT',
-            headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
+            headers: { 'Content-Type': 'application/json', ...headers },
             body: JSON.stringify(data),
         });
         return res.json();
     },
 
     seedTables: async () => {
+        const headers = getAuthHeader();
         const res = await safeFetch(`${API_URL}/tables/seed`, {
             method: 'POST',
-            headers: getAuthHeader(),
+            headers,
         });
         return res.json();
     },
@@ -225,23 +270,26 @@ const api = {
     // Reservations
     getReservations: async (params) => {
         const queryString = new URLSearchParams(params).toString();
-        const res = await safeFetch(`${API_URL}/reservations?${queryString}`, { headers: getAuthHeader() });
+        const headers = getAuthHeader();
+        const res = await safeFetch(`${API_URL}/reservations?${queryString}`, { headers });
         return res.json();
     },
 
     createReservation: async (data) => {
+        const headers = getAuthHeader();
         const res = await safeFetch(`${API_URL}/reservations`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
+            headers: { 'Content-Type': 'application/json', ...headers },
             body: JSON.stringify(data),
         });
         return res.json();
     },
 
     updateReservation: async (id, data) => {
+        const headers = getAuthHeader();
         const res = await safeFetch(`${API_URL}/reservations/${id}`, {
             method: 'PUT',
-            headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
+            headers: { 'Content-Type': 'application/json', ...headers },
             body: JSON.stringify(data),
         });
         return res.json();
@@ -249,16 +297,18 @@ const api = {
 
     // Settings
     getSettings: async () => {
-        const res = await safeFetch(`${API_URL}/settings`, { headers: getAuthHeader() });
+        const headers = getAuthHeader();
+        const res = await safeFetch(`${API_URL}/settings`, { headers });
         const data = await res.json();
         if (!res.ok) throw new Error(data?.message || 'Failed to load settings');
         return data;
     },
 
     updateSettings: async (data) => {
+        const headers = getAuthHeader();
         const res = await safeFetch(`${API_URL}/settings`, {
             method: 'PUT',
-            headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
+            headers: { 'Content-Type': 'application/json', ...headers },
             body: JSON.stringify(data),
         });
         const out = await res.json();
@@ -267,9 +317,10 @@ const api = {
     },
 
     backupSystem: async () => {
+        const headers = getAuthHeader();
         const res = await safeFetch(`${API_URL}/settings/backup`, {
             method: 'POST',
-            headers: getAuthHeader(),
+            headers,
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data?.message || 'Backup failed');
@@ -278,9 +329,10 @@ const api = {
 
     // Billing
     calculateBill: async (data) => {
+        const headers = getAuthHeader();
         const res = await safeFetch(`${API_URL}/billing/calculate`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
+            headers: { 'Content-Type': 'application/json', ...headers },
             body: JSON.stringify(data),
         });
         const out = await res.json();
@@ -289,9 +341,10 @@ const api = {
     },
 
     processPayment: async (data) => {
+        const headers = getAuthHeader();
         const res = await safeFetch(`${API_URL}/billing/pay`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
+            headers: { 'Content-Type': 'application/json', ...headers },
             body: JSON.stringify(data),
         });
         const out = await res.json();
@@ -300,9 +353,10 @@ const api = {
     },
 
     uploadReceiptPDF: async (data) => {
+        const headers = getAuthHeader();
         const res = await safeFetch(`${API_URL}/billing/receipt-pdf`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
+            headers: { 'Content-Type': 'application/json', ...headers },
             body: JSON.stringify(data),
         });
         const out = await res.json();

@@ -1,0 +1,28 @@
+🌍 PUBLIC URL CREATION GUIDE
+============================
+
+QUICKEST WAY TO GET PUBLIC URL:
+-------------------------------
+1. Run: ./get-public-url.sh
+2. Copy the URL shown
+3. Share with anyone!
+
+That's it! The script handles everything automatically.
+
+ALTERNATIVE METHODS:
+--------------------
+- Cloudflare Tunnel: ./cloudflare-tunnel.sh
+- ngrok: ./ngrok-setup.sh
+- Router Port Forwarding: See GLOBAL-ACCESS-SETUP.md
+
+DEFAULT LOGIN:
+--------------
+Email: admin@restaurant.com
+Password: admin123
+
+⚠️ Change password after first login!
+
+For more details, see:
+- CREATE-PUBLIC-LINK.md
+- GLOBAL-ACCESS-SETUP.md
+- START-HERE.md

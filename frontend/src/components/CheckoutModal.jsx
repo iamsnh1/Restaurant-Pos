@@ -287,9 +287,22 @@ const CheckoutModal = ({ order, isOpen, onClose, onPaymentComplete }) => {
             pdf.text("Generated via Voxxera POS", mid, y + 2, { align: 'center' });
 
             const fileName = `Bill-${order.orderNumber}.pdf`;
-            
-            // Convert PDF to base64
-            const pdfBase64 = pdf.output('base64');
+
+            // Convert PDF to blob and then to base64 for better reliability
+            const pdfBlob = pdf.output('blob');
+
+            // Promise wrapper for FileReader
+            const getBase64 = (blob) => new Promise((resolve, reject) => {
+                const r = new FileReader();
+                r.onload = () => resolve(r.result.split(',')[1]);
+                r.onerror = reject;
+                r.readAsDataURL(blob);
+            });
+
+            const pdfBase64 = await getBase64(pdfBlob);
+
+            console.log('[PDF Debug] Filename:', fileName);
+            console.log('[PDF Debug] Base64 Size:', pdfBase64?.length);
 
             // Upload PDF to backend and get shareable download URL
             let pdfUrl = null;
@@ -300,48 +313,53 @@ const CheckoutModal = ({ order, isOpen, onClose, onPaymentComplete }) => {
                     fileName: fileName
                 });
                 pdfUrl = uploadRes.pdfUrl;
-                // Use API_BASE if backend returned relative URL
                 if (pdfUrl && !pdfUrl.startsWith('http')) {
                     pdfUrl = `${API_BASE}${pdfUrl.startsWith('/') ? '' : '/'}${pdfUrl}`;
                 }
             } catch (error) {
                 console.error('PDF upload failed:', error);
-                // Fallback: construct URL manually
                 pdfUrl = `${API_BASE}/api/billing/receipt/${orderId}/pdf`;
             }
 
-            // Download PDF locally
+            // Attempt Native File Sharing (Direct PDF)
+            const shareFile = new File([pdfBlob], fileName, { type: 'application/pdf' });
+            if (navigator.canShare && navigator.canShare({ files: [shareFile] })) {
+                try {
+                    await navigator.share({
+                        files: [shareFile],
+                        title: `Bill - ${order.orderNumber}`,
+                        text: `Receipt from ${settings?.restaurant?.name || 'Restaurant'}`
+                    });
+                    // If shared successfully, we might not need to open WhatsApp link
+                    setIsGenerating(false);
+                    return;
+                } catch (shareError) {
+                    console.log('Native share cancelled or failed:', shareError);
+                    // Fall back to WhatsApp link below
+                }
+            }
+
+            // Fallback: Local Download
             pdf.save(fileName);
 
-            // Share via WhatsApp with PDF download link
+            // Fallback: WhatsApp link with download URL
             const phone = customerPhone.replace(/\D/g, '');
             if (phone && phone.length >= 10) {
                 const formattedPhone = phone.startsWith('0') ? `91${phone.slice(1)}` : (phone.length === 10 ? `91${phone}` : phone);
                 const restaurantName = settings?.restaurant?.name || 'Our Restaurant';
-                const thankYouText = settings?.receipt?.footer || 'Thank you for dining with us! We hope to see you again.';
 
                 let message = `Hi! 👋\n\n` +
                     `*${restaurantName}*\n\n` +
                     `Thank you for your order!\n\n` +
                     `*Order:* ${order.orderNumber}\n` +
                     `*Total:* ₹${billData.grandTotal.toFixed(2)}\n\n`;
-                
-                if (pdfUrl) {
-                    message += `📄 *Download your bill PDF:*\n${pdfUrl}\n\n`;
-                }
-                
-                message += `${thankYouText}`;
 
-                const encodedMessage = encodeURIComponent(message);
-                setTimeout(() => {
-                    window.open(`https://wa.me/${formattedPhone}?text=${encodedMessage}`, '_blank');
-                }, 500);
+                if (pdfUrl) message += `📄 *Download Bill PDF:*\n${pdfUrl}\n\n`;
+                message += settings?.receipt?.footer || 'Thank you!';
+
+                window.open(`https://wa.me/${formattedPhone}?text=${encodeURIComponent(message)}`, '_blank');
             } else {
-                if (pdfUrl) {
-                    alert(`Bill PDF downloaded: ${fileName}\n\nPDF download link: ${pdfUrl}\n\nEnter customer phone number and click Share again to send via WhatsApp.`);
-                } else {
-                    alert(`Bill PDF downloaded: ${fileName}\n\nEnter customer phone number and click Share again to send via WhatsApp.`);
-                }
+                alert(`PDF Downloaded: ${fileName}\nAdd phone number to share via WhatsApp.`);
             }
         } catch (error) {
             console.error('Sharing failed:', error);
@@ -465,33 +483,52 @@ const CheckoutModal = ({ order, isOpen, onClose, onPaymentComplete }) => {
                     {/* Footer Actions */}
                     <div className="p-3 sm:p-4 border-t bg-gray-50 flex flex-col gap-2 print:hidden shrink-0">
                         <div className="flex flex-col sm:flex-row gap-2">
-                        <button
-                            onClick={handleShareReceipt}
-                            disabled={isGenerating}
-                            className="flex-1 bg-green-600 text-white py-3.5 px-2 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-green-700 transition shadow-lg disabled:opacity-50 text-sm"
-                        >
-                            {isGenerating ? (
-                                <div className="animate-spin h-4 w-4 border-2 border-white/30 border-t-white rounded-full" />
-                            ) : (
-                                <MessageCircle size={18} />
-                            )}
-                            {isGenerating ? 'Generating PDF...' : 'Share via WhatsApp'}
-                        </button>
-                        <div className="flex gap-2 flex-1">
-                            <button
-                                onClick={handlePrintAndClose}
-                                className="flex-1 bg-slate-900 text-white py-3.5 px-2 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-slate-800 transition shadow-lg text-sm"
-                            >
-                                <Printer size={18} />
-                                Print
-                            </button>
-                            <button
-                                onClick={onClose}
-                                className="px-4 bg-gray-200 text-gray-700 py-3.5 rounded-xl font-bold hover:bg-gray-300 transition text-sm"
-                            >
-                                Close
-                            </button>
-                        </div>
+                            <div className="flex flex-col gap-2 flex-1">
+                                <button
+                                    onClick={handleShareReceipt}
+                                    disabled={isGenerating}
+                                    className="w-full bg-blue-600 text-white py-3 px-2 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-blue-700 transition shadow-lg disabled:opacity-50 text-sm"
+                                >
+                                    {isGenerating ? <div className="animate-spin h-4 w-4 border-2 border-white/30 border-t-white rounded-full" /> : <Share2 size={18} />}
+                                    Share PDF File
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        const phone = customerPhone.replace(/\D/g, '');
+                                        if (!phone || phone.length < 10) {
+                                            alert('Please enter a valid 10-digit customer phone number.');
+                                            return;
+                                        }
+
+                                        // Explain why we use a link for direct redirect
+                                        console.log('Using Direct Link for specific number redirect. Use "Share PDF File" for direct file attaching.');
+
+                                        const restaurantName = settings?.restaurant?.name || 'Restaurant';
+                                        let msg = `Hi! 👋\n\n*${restaurantName}*\n\nThank you for your order!\n*Order:* ${order.orderNumber}\n*Total:* ₹${billData.grandTotal.toFixed(2)}\n\n📄 *View/Download Bill:* \n${window.location.origin}/api/billing/receipt/${orderId}/pdf\n\n${settings?.receipt?.footer || 'Thank you!'}`;
+
+                                        window.open(`https://wa.me/91${phone.length === 10 ? phone : phone.slice(-10)}?text=${encodeURIComponent(msg)}`, '_blank');
+                                    }}
+                                    className="w-full bg-green-600 text-white py-3 px-2 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-green-700 transition shadow-lg text-sm"
+                                >
+                                    <MessageCircle size={18} />
+                                    WhatsApp (Direct)
+                                </button>
+                            </div>
+                            <div className="flex gap-2 flex-1">
+                                <button
+                                    onClick={handlePrintAndClose}
+                                    className="flex-1 bg-slate-900 text-white py-3.5 px-2 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-slate-800 transition shadow-lg text-sm"
+                                >
+                                    <Printer size={18} />
+                                    Print
+                                </button>
+                                <button
+                                    onClick={onClose}
+                                    className="px-4 bg-gray-200 text-gray-700 py-3.5 rounded-xl font-bold hover:bg-gray-300 transition text-sm"
+                                >
+                                    Close
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -637,6 +674,52 @@ const CheckoutModal = ({ order, isOpen, onClose, onPaymentComplete }) => {
                             </button>
                         ))}
                     </div>
+
+                    {/* Split Payment Controls */}
+                    {paymentMethod === 'split' && (
+                        <div className="mb-6 animate-in slide-in-from-top duration-300">
+                            <div className="flex items-center justify-between mb-3">
+                                <span className="text-xs font-bold text-gray-400 uppercase">Split Into</span>
+                                <div className="flex items-center gap-2 bg-white/5 rounded-lg p-1">
+                                    {[2, 3, 4, 5].map(n => (
+                                        <button
+                                            key={n}
+                                            onClick={() => setSplitParts(n)}
+                                            className={`w-7 h-7 rounded-md text-xs font-bold transition ${splitParts === n ? 'bg-purple-600 text-white' : 'text-gray-400 hover:text-white'}`}
+                                        >
+                                            {n}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                            <div className="space-y-2 max-h-[200px] overflow-y-auto pr-1 custom-scrollbar">
+                                {splitPayments.map((part) => (
+                                    <div key={part.id} className="bg-white/5 border border-white/10 rounded-xl p-3 flex items-center justify-between">
+                                        <div>
+                                            <div className="text-[10px] text-gray-500 uppercase font-bold">Part {part.id}</div>
+                                            <div className="text-white font-bold text-sm">₹{part.amount}</div>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <select
+                                                value={part.method}
+                                                onChange={(e) => updateSplitPayment(part.id, 'method', e.target.value)}
+                                                className="bg-gray-800 text-white text-[10px] border-none rounded px-2 py-1 outline-none"
+                                            >
+                                                <option value="cash">Cash</option>
+                                                <option value="card">Card</option>
+                                                <option value="upi">UPI</option>
+                                            </select>
+                                            {part.status === 'paid' ? (
+                                                <div className="text-green-500 bg-green-500/10 p-1 rounded-full"><Check size={14} /></div>
+                                            ) : (
+                                                <div className="w-5 h-5 border border-white/20 rounded-full" />
+                                            )}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
 
                     <div className="mt-auto pt-6 border-t border-white/10">
                         {!billData && !loading && (

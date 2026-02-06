@@ -37,7 +37,9 @@ const POSTerminal = () => {
 
     // Socket for notifications and menu sync
     useEffect(() => {
-        const socket = io(API_BASE);
+        // For Cloudflare Pages, use backend URL directly (not proxied)
+        const socketUrl = import.meta.env.VITE_API_URL?.replace('/api', '') || API_BASE || window.location.origin;
+        const socket = io(socketUrl);
 
         socket.emit('joinPOS');
 

@@ -1,32 +1,35 @@
 const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 const { PrismaClient } = require('@prisma/client');
-const { PrismaPg } = require('@prisma/adapter-pg');
-const { Pool } = require('pg');
-
-const pool = new Pool({ connectionString: process.env.DATABASE_URL });
-const adapter = new PrismaPg(pool);
-const prisma = new PrismaClient({ adapter });
 const bcrypt = require('bcryptjs');
+
+const prisma = new PrismaClient();
 
 async function main() {
     console.log('Seeding database...');
+    console.log('Using database URL:', process.env.DATABASE_URL ? 'Defined' : 'Undefined');
 
     // 1. Create Admin User
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash('admin123', salt);
 
-    const admin = await prisma.user.upsert({
+    let admin = await prisma.user.findUnique({
         where: { email: 'admin@restaurant.com' },
-        update: {},
-        create: {
-            email: 'admin@restaurant.com',
-            name: 'Main Admin',
-            password: hashedPassword,
-            role: 'admin',
-        },
     });
-    console.log('Admin user created:', admin.email);
+
+    if (!admin) {
+        admin = await prisma.user.create({
+            data: {
+                email: 'admin@restaurant.com',
+                name: 'Main Admin',
+                password: hashedPassword,
+                role: 'admin',
+            },
+        });
+        console.log('Admin user created:', admin.email);
+    } else {
+        console.log('Admin user already exists:', admin.email);
+    }
 
     // 2. Create Categories & Items
     const categoryData = [

@@ -11,26 +11,13 @@ const connectDB = require('./config/db');
 connectDB();
 
 const app = express();
+app.set('trust proxy', true);
 const server = http.createServer(app);
 
-// CORS - allow frontend URL from env
-const allowedOrigins = [
-  'http://localhost:5173',
-  'http://localhost:5174',
-  'http://127.0.0.1:5173',
-  'http://127.0.0.1:5174',
-  'http://localhost',
-  process.env.FRONTEND_URL
-].filter(Boolean);
-
+// CORS - Allow all origins for public access
+// In production, you may want to restrict this to specific domains
 const corsOptions = {
-  origin: (origin, callback) => {
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(null, true); // Allow all origins for development
-    }
-  },
+  origin: true, // Allow all origins for public access
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
@@ -71,7 +58,7 @@ io.on('connection', (socket) => {
 });
 
 // Middleware
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
 app.use(cors(corsOptions));
 
 // Routes
@@ -90,12 +77,16 @@ app.get('/', (req, res) => {
   res.send('API is running...');
 });
 
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 5001;
+const HOST = process.env.HOST || '0.0.0.0'; // Bind to all interfaces for network access
 
+// Vercel serverless function export
 if (require.main === module) {
-  server.listen(PORT, () => {
-    console.log(`Server running on port ${PORT} with Socket.io`);
+  server.listen(PORT, HOST, () => {
+    console.log(`🚀 Server running on http://${HOST}:${PORT} with Socket.io`);
+    console.log(`📡 Accessible from network at: http://YOUR_IP:${PORT}`);
+    console.log(`🌐 API available at: http://YOUR_IP:${PORT}/api`);
+    console.log(`\n✅ First-time setup: POST http://YOUR_IP:${PORT}/api/auth/setup`);
   });
 }
-
 module.exports = app;

@@ -1,29 +1,51 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/png" href="/icon.png" />
-    <link rel="manifest" href="/manifest.json" />
-    <meta name="theme-color" content="#7c3aed" />
-    <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <link rel="apple-touch-icon" href="/icon.png" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <title>Voxxera POS | Professional Terminal</title>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.jsx"></script>
-    <script>
-      if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js').then(reg => {
-            console.log('SW Registered!', reg);
-          }).catch(err => {
-            console.log('SW Register Failed:', err);
+
+<head>
+  <meta charset="UTF-8" />
+  <link rel="icon" type="image/png" href="/icon.png" />
+  <link rel="manifest" href="/manifest.json" />
+  <meta name="theme-color" content="#7c3aed" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <link rel="apple-touch-icon" href="/icon.png" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Voxxera POS | Professional Terminal</title>
+</head>
+
+<body>
+  <div id="root"></div>
+  <script type="module" src="/src/main.jsx"></script>
+
+  <script>
+    // Force unregister Service Workers to clear stale caches
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then(registrations => {
+        for (let registration of registrations) {
+          registration.unregister().then(() => {
+            console.log('[SW] Service Worker unregistered to clear cache');
+            window.location.reload(); // Force reload to get fresh assets
           });
-        });
-      }
-    </script>
-  </body>
+        }
+      });
+    }
+
+    // Request persistent storage (for IndexedDB)
+    if ('storage' in navigator && 'persist' in navigator.storage) {
+      navigator.storage.persist().then(granted => {
+        console.log('[Storage] Persistent storage granted:', granted);
+      });
+    }
+
+    // Estimate storage quota
+    if ('storage' in navigator && 'estimate' in navigator.storage) {
+      navigator.storage.estimate().then(estimate => {
+        console.log('[Storage] Available:', (estimate.quota / 1024 / 1024).toFixed(2), 'MB');
+        console.log('[Storage] Used:', (estimate.usage / 1024 / 1024).toFixed(2), 'MB');
+      });
+    }
+  </script>
+</body>
+
 </html>

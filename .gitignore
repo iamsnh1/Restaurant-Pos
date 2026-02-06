@@ -12,6 +12,13 @@ dist/
 backend/.env
 frontend/.env
 
+# SQLite database files (local storage)
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+backend/prisma/data.db*
+
 # OS and editors
 .DS_Store
 *.log

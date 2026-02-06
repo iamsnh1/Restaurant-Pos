@@ -21,7 +21,8 @@ const KitchenDisplay = () => {
 
         fetchOrders();
 
-        const base = API_BASE || window.location.origin;
+        // For Cloudflare Pages, use backend URL directly (not proxied)
+        const base = import.meta.env.VITE_API_URL?.replace('/api', '') || API_BASE || window.location.origin;
         console.log('[KITCHEN] Connecting to socket at:', base);
         const socket = io(base, {
             path: '/socket.io',

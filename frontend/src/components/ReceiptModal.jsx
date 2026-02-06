@@ -37,24 +37,78 @@ const ReceiptModal = ({ isOpen, onClose, order, settings }) => {
     };
 
     const handleSharePDF = async () => {
-        const phone = customerPhone.replace(/\D/g, '');
-        if (phone && phone.length >= 10) {
-            handleWhatsAppText();
-        } else {
-            // Manual fallback for merchants without a phone number
-            try {
-                setIsGenerating(true);
-                const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: [80, 250] });
-                pdf.setFontSize(14);
-                pdf.text((restaurant.name || 'Restaurant').toUpperCase(), 40, 15, { align: 'center' });
-                pdf.setFontSize(10);
-                pdf.text("Order: " + order.orderNumber, 40, 25, { align: 'center' });
-                pdf.save(`Receipt-${order.orderNumber}.pdf`);
-            } catch (err) {
-                console.error(err);
-            } finally {
-                setIsGenerating(false);
+        try {
+            setIsGenerating(true);
+
+            // Create PDF manually (POS format)
+            const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: [80, 250] });
+            let y = 10;
+            const mid = 40;
+
+            // Restaurant Info
+            pdf.setFontSize(14);
+            pdf.setFont("helvetica", "bold");
+            pdf.text((restaurant.name || 'Restaurant').toUpperCase(), mid, y, { align: 'center' });
+            y += 8;
+
+            pdf.setFontSize(8);
+            pdf.setFont("helvetica", "normal");
+            pdf.text(`Order: ${order.orderNumber}`, 5, y);
+            pdf.text(new Date().toLocaleDateString(), 75, y, { align: 'right' });
+            y += 10;
+
+            // Items (Basic)
+            pdf.setFont("helvetica", "bold");
+            pdf.text("Items", 5, y);
+            y += 2;
+            pdf.line(5, y, 75, y);
+            y += 5;
+            pdf.setFont("helvetica", "normal");
+
+            order.items?.forEach(item => {
+                pdf.text(`${item.quantity}x ${item.menuItem?.name || item.name}`, 5, y);
+                pdf.text((item.price * item.quantity).toFixed(2), 75, y, { align: 'right' });
+                y += 5;
+            });
+
+            y += 5;
+            pdf.setFont("helvetica", "bold");
+            pdf.text("Grand Total", 5, y);
+            pdf.text(`Rs. ${billData.grandTotal.toFixed(2)}`, 75, y, { align: 'right' });
+            y += 10;
+
+            pdf.setFontSize(8);
+            pdf.setFont("helvetica", "italic");
+            pdf.text("Thank you for your visit!", mid, y, { align: 'center' });
+
+            const fileName = `Receipt-${order.orderNumber}.pdf`;
+            const pdfBlob = pdf.output('blob');
+            const shareFile = new File([pdfBlob], fileName, { type: 'application/pdf' });
+
+            // Direct Sharing if supported
+            if (navigator.canShare && navigator.canShare({ files: [shareFile] })) {
+                try {
+                    await navigator.share({
+                        files: [shareFile],
+                        title: `Receipt - ${order.orderNumber}`,
+                        text: `Your bill from ${restaurant.name || 'Restaurant'}`
+                    });
+                    setIsGenerating(false);
+                    return;
+                } catch (err) {
+                    console.log('Share cancelled:', err);
+                }
             }
+
+            // Fallback: Download and WhatsApp Link
+            pdf.save(fileName);
+            handleWhatsAppText();
+
+        } catch (err) {
+            console.error('PDF sharing error:', err);
+            alert('Could not generate PDF');
+        } finally {
+            setIsGenerating(false);
         }
     };
 
@@ -66,18 +120,18 @@ const ReceiptModal = ({ isOpen, onClose, order, settings }) => {
         }
 
         const restaurantName = restaurant.name || 'Our Restaurant';
-        const formattedPhone = phone.length === 10 ? `91${phone}` : phone;
+        const formattedPhone = phone.startsWith('91') ? phone : `91${phone.slice(-10)}`;
+        const pdfLink = `${window.location.origin}/api/billing/receipt/${order._id}/pdf`;
 
-        // Option 1: Digital Receipt Link
-        const receiptLink = `${window.location.origin}/receipt/${order._id}`;
+        const message = `Hi! 👋\n\n` +
+            `*${restaurantName}*\n\n` +
+            `Thank you for your order!\n` +
+            `*Order:* ${order.orderNumber}\n` +
+            `*Total:* ₹${billData.grandTotal.toFixed(2)}\n\n` +
+            `📄 *View/Download Bill:* \n${pdfLink}\n\n` +
+            `${receipt.footer || 'Thank you!'}`;
 
-        const message = `*Bill from ${restaurantName}*%0A%0A` +
-            `*Order:* ${order.orderNumber}%0A` +
-            `*Total: ₹${billData.grandTotal.toFixed(2)}*%0A%0A` +
-            `You can view/download your digital receipt here:%0A${receiptLink}%0A%0A` +
-            `Thank you!`;
-
-        window.open(`https://wa.me/${formattedPhone}?text=${message}`, '_blank');
+        window.open(`https://wa.me/${formattedPhone}?text=${encodeURIComponent(message)}`, '_blank');
     };
 
     return (
@@ -195,29 +249,41 @@ const ReceiptModal = ({ isOpen, onClose, order, settings }) => {
                 </div>
 
                 {/* Footer Actions */}
-                <div className="p-4 border-t bg-gray-50 flex gap-2 print:hidden overflow-x-auto">
-                    <button
-                        onClick={handleSharePDF}
-                        disabled={isGenerating}
-                        className="flex-1 bg-blue-600 text-white py-3 px-2 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-blue-700 transition shadow-lg disabled:opacity-50 min-w-fit"
-                    >
-                        {isGenerating ? <div className="animate-spin h-4 w-4 border-2 border-white/30 border-t-white rounded-full" /> : <Share2 size={18} />}
-                        Share PDF
-                    </button>
-                    <button
-                        onClick={handleWhatsAppText}
-                        className="flex-1 bg-green-600 text-white py-3 px-2 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-green-700 transition shadow-lg min-w-fit"
-                    >
-                        <MessageCircle size={18} />
-                        WhatsApp
-                    </button>
-                    <button
-                        onClick={handlePrint}
-                        className="flex-1 bg-slate-900 text-white py-3 px-2 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-slate-800 transition shadow-lg min-w-fit"
-                    >
-                        <Printer size={18} />
-                        Print / PDF
-                    </button>
+                <div className="p-3 sm:p-4 border-t bg-gray-50 flex flex-col gap-2 print:hidden shrink-0">
+                    <div className="flex flex-col sm:flex-row gap-2">
+                        <div className="flex flex-col gap-2 flex-1">
+                            <button
+                                onClick={handleSharePDF}
+                                disabled={isGenerating}
+                                className="w-full bg-blue-600 text-white py-3 px-2 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-blue-700 transition shadow-lg disabled:opacity-50 text-sm"
+                            >
+                                {isGenerating ? <div className="animate-spin h-4 w-4 border-2 border-white/30 border-t-white rounded-full" /> : <Share2 size={18} />}
+                                Share PDF File
+                            </button>
+                            <button
+                                onClick={handleWhatsAppText}
+                                className="w-full bg-green-600 text-white py-3 px-2 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-green-700 transition shadow-lg text-sm"
+                            >
+                                <MessageCircle size={18} />
+                                WhatsApp (Direct)
+                            </button>
+                        </div>
+                        <div className="flex gap-2 flex-1 items-center">
+                            <button
+                                onClick={handlePrint}
+                                className="flex-1 bg-slate-900 text-white py-3.5 px-2 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-slate-800 transition shadow-lg text-sm"
+                            >
+                                <Printer size={18} />
+                                Print
+                            </button>
+                            <button
+                                onClick={onClose}
+                                className="px-5 bg-gray-200 text-gray-700 py-3.5 rounded-xl font-bold hover:bg-gray-300 transition text-sm"
+                            >
+                                Close
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </div>
 

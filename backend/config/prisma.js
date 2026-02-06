@@ -1,11 +1,12 @@
 const { PrismaClient } = require('@prisma/client');
 
+// SQLite database (local file storage)
 const prisma = new PrismaClient();
 
 const connectDB = async () => {
     try {
         await prisma.$connect();
-        console.log('PostgreSQL Connected via Prisma');
+        console.log('SQLite Database Connected (Local Storage)');
     } catch (error) {
         console.error(`Error: ${error.message}`);
         process.exit(1);

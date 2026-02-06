@@ -1,0 +1,47 @@
+🌍 PORT FORWARDING SETUP - Restaurant POS
+==========================================
+
+APPLICATION STATUS:
+-------------------
+✅ Application is RUNNING
+✅ Frontend: http://localhost:80
+✅ Backend API: http://localhost:5001/api
+
+YOUR NETWORK INFO:
+------------------
+LOCAL IP: [Check below]
+PUBLIC IP: [Check below]
+
+PORT FORWARDING PORTS:
+----------------------
+Port 80  → Frontend (HTTP)
+Port 5001 → Backend API (optional)
+
+ACCESS URLS:
+------------
+Local:     http://localhost:80
+Network:   http://YOUR_LOCAL_IP:80
+Public:    http://YOUR_PUBLIC_IP:80 (after port forwarding)
+
+ROUTER CONFIGURATION:
+---------------------
+1. Access router admin: http://192.168.1.1 (or check router label)
+2. Go to: Port Forwarding / Virtual Server / NAT
+3. Add rule:
+   - Service: Restaurant POS
+   - External Port: 80
+   - Internal IP: YOUR_LOCAL_IP (see below)
+   - Internal Port: 80
+   - Protocol: TCP
+   - Status: Enabled
+4. Save and restart router
+
+QUICK PUBLIC ACCESS (No Router Config):
+---------------------------------------
+Run: ./start-with-tunnel.sh
+This creates a public URL instantly without router setup!
+
+DEFAULT LOGIN:
+--------------
+Email: admin@restaurant.com
+Password: admin123

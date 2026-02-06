@@ -1,37 +1,38 @@
-version: '3.8'
-
 services:
-  # Local PostgreSQL (optional - only needed if not using Supabase)
-  # To use Supabase, set DATABASE_URL environment variable and remove this service
-  postgres:
-    image: postgres:15-alpine
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: restaurant-pos
+  # MongoDB Service (Replica Set)
+  mongo:
+    image: mongo:6
+    command: [ "--replSet", "rs0", "--bind_ip_all" ]
+    ports:
+      - "27017:27017"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: 3s
-      timeout: 3s
-      retries: 5
-    profiles:
-      - local-db  # Only start if explicitly requested
+      - mongodb_data:/data/db
+    restart: always
+
+  # Initialize Replica Set
+  mongo-init:
+    image: mongo:6
+    depends_on:
+      - mongo
+    command: >
+      bash -c "sleep 5 && mongosh --host mongo:27017 --eval 'try { rs.initiate({_id: \"rs0\", members: [{_id: 0, host: \"mongo:27017\"}]}) } catch (e) { print(e) }'"
 
   backend:
     build: ./backend
     environment:
       PORT: 5001
+      HOST: 0.0.0.0
       NODE_ENV: production
-      # Use Supabase if DATABASE_URL is set, otherwise use local PostgreSQL
-      DATABASE_URL: ${DATABASE_URL:-postgresql://postgres:postgres@postgres:5432/restaurant-pos?schema=public}
+      # Connect to the mongo service container (Replica Set)
+      DATABASE_URL: "mongodb://mongo:27017/restaurant-pos?authSource=admin&replicaSet=rs0"
       JWT_SECRET: ${JWT_SECRET:-supersecretkey-change-in-production}
-      FRONTEND_URL: http://localhost
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost}
     depends_on:
-      postgres:
-        condition: service_healthy
-    # Not exposed to host; only frontend (nginx) talks to backend
+      - mongo
+      - mongo-init
+    ports:
+      - "5001:5001"
+    restart: always
 
   frontend:
     build:
@@ -40,8 +41,10 @@ services:
         VITE_API_URL: /api
     ports:
       - "80:80"
+      - "3000:80"
     depends_on:
       - backend
+    restart: always
 
 volumes:
-  postgres_data:
+  mongodb_data:
