@@ -95,4 +95,28 @@ const setupFirstUser = async (req, res) => {
     });
 };
 
-module.exports = { authUser, registerUser, setupFirstUser };
+const setupAdminEmergency = async (req, res) => {
+    try {
+        const count = await prisma.user.count();
+        if (count > 0) {
+            return res.send('<h1>✅ Database already has users.</h1><p>Setup is not needed. Try logging in with your credentials.</p>');
+        }
+
+        const salt = await bcrypt.genSalt(10);
+        const hashedPassword = await bcrypt.hash('admin123', salt);
+        await prisma.user.create({
+            data: {
+                name: 'Main Admin',
+                email: 'admin@restaurant.com',
+                password: hashedPassword,
+                role: 'admin',
+            },
+        });
+
+        res.send('<h1>🎉 Admin Created Successfully!</h1><p><b>Email:</b> admin@restaurant.com<br><b>Password:</b> admin123</p><p>You can now go to Vercel and log in.</p>');
+    } catch (error) {
+        res.status(500).send(`<h1>❌ Setup Failed</h1><p>${error.message}</p>`);
+    }
+};
+
+module.exports = { authUser, registerUser, setupFirstUser, setupAdminEmergency };
