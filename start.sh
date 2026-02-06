@@ -10,9 +10,9 @@ echo "PORT=$PORT"
 echo "DATABASE_URL=${DATABASE_URL:+SET}" # Show SET if exists, empty if not
 echo "JWT_SECRET=${JWT_SECRET:+SET}"
 
-# Wait a bit for Render to inject environment variables
+# Wait a bit for platform to inject environment variables
 echo "Waiting for environment variables..."
-sleep 10
+sleep 5
 
 # Check DATABASE_URL at runtime (not build time)
 if [ -z "$DATABASE_URL" ]; then
