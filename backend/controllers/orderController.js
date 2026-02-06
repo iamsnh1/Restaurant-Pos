@@ -99,6 +99,9 @@ const createOrder = async (req, res) => {
     try {
         const { orderType, tableNumber, items, customer, discount } = req.body;
 
+        // Map frontend orderType (dine-in) to Prisma enum (dine_in)
+        const normalizedOrderType = orderType === 'dine-in' ? 'dine_in' : (orderType || 'dine_in');
+
         // Calculate totals
         // Ensure items have price. If relying on frontend, risky. Ideally fetch from DB.
         // Assuming frontend sends name/price for now (Snapshot approach).
@@ -112,7 +115,7 @@ const createOrder = async (req, res) => {
         const createdOrder = await prisma.order.create({
             data: {
                 orderNumber,
-                orderType,
+                orderType: normalizedOrderType,
                 tableNumber: tableNumber ? parseInt(tableNumber) : null,
                 subtotal,
                 tax,
@@ -138,27 +141,60 @@ const createOrder = async (req, res) => {
                 // Create OrderItems
                 items: {
                     create: items.map(item => ({
-                        menuItemId: item.menuItem, // passed as ID
+                        menuItemId: item.menuItem || item.menuItemId, // ID from cart
                         quantity: item.quantity,
                         name: item.name,
-                        price: item.price,
+                        price: Number(item.price),
                         variant: item.variant,
                         specialInstructions: item.specialInstructions,
                         status: 'pending'
                     }))
                 }
             },
-            include: { items: true }
+            include: { items: { include: { menuItem: { select: { name: true } } } } }
         });
 
-        // Emit new order event
+        // Emit new order so kitchen gets it instantly (broadcast to all + room so it works even before kitchen joins room)
         const io = req.app.get('io');
         if (io) {
-            io.to('kitchen').emit('newOrder', { ...createdOrder, _id: createdOrder.id }); // Add _id for frontend
+            const kitchenOrder = {
+                ...createdOrder,
+                _id: createdOrder.id,
+                id: createdOrder.id,
+                orderType: normalizedOrderType === 'dine_in' ? 'dine-in' : normalizedOrderType,
+                status: 'pending', // Ensure status is pending for kitchen
+                items: (createdOrder.items || []).map(i => ({
+                    ...i,
+                    _id: i.id,
+                    id: i.id,
+                    name: i.name || i.menuItem?.name,
+                    quantity: i.quantity,
+                    price: i.price,
+                    notes: i.specialInstructions,
+                })),
+            };
+            console.log(`[ORDER] Emitting newOrder to kitchen. Order ID: ${createdOrder.id}, OrderNumber: ${orderNumber}, Status: ${kitchenOrder.status}`);
+            console.log(`[ORDER] Kitchen order items count: ${kitchenOrder.items.length}`);
+            const kitchenRoomSize = io.sockets.adapter.rooms.get('kitchen')?.size || 0;
+            console.log(`[ORDER] Kitchen room has ${kitchenRoomSize} clients`);
+            io.to('kitchen').emit('newOrder', kitchenOrder);
+            io.emit('newOrder', kitchenOrder); // broadcast to all so kitchen gets it even if not in room yet
             io.to('pos').emit('orderCreated', { ...createdOrder, _id: createdOrder.id });
+            console.log(`[ORDER] Emitted to kitchen room (${kitchenRoomSize} clients) and broadcast to all`);
+        } else {
+            console.error('[ORDER] Socket.io not available! Cannot emit newOrder');
         }
 
-        res.status(201).json({ ...createdOrder, _id: createdOrder.id });
+        const response = {
+            ...createdOrder,
+            _id: createdOrder.id,
+            items: createdOrder.items.map(i => ({
+                ...i,
+                _id: i.id,
+                menuItem: i.menuItem ? { ...i.menuItem, _id: i.menuItemId } : undefined
+            }))
+        };
+        res.status(201).json(response);
     } catch (error) {
         res.status(400).json({ message: error.message });
     }
@@ -243,9 +279,25 @@ const getKitchenOrders = async (req, res) => {
             orderBy: { createdAt: 'asc' }
         });
 
-        const mappedOrders = orders.map(o => ({ ...o, _id: o.id }));
+        console.log(`[KITCHEN API] Found ${orders.length} orders for kitchen`);
+        const mappedOrders = orders.map(o => ({
+            ...o,
+            _id: o.id,
+            id: o.id,
+            orderType: o.orderType === 'dine_in' ? 'dine-in' : o.orderType,
+            items: (o.items || []).map(i => ({
+                ...i,
+                _id: i.id,
+                id: i.id,
+                name: i.name,
+                quantity: i.quantity,
+                price: i.price,
+            }))
+        }));
+        console.log(`[KITCHEN API] Returning ${mappedOrders.length} mapped orders`);
         res.json(mappedOrders);
     } catch (error) {
+        console.error('[KITCHEN API] Error:', error);
         res.status(500).json({ message: error.message });
     }
 };

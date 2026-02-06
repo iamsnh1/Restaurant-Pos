@@ -116,7 +116,11 @@ router.post('/pay', protect, async (req, res) => {
 
         if (totalPaid >= billingDetails.grandTotal - 0.5) {
             paymentStatus = 'paid';
-            updates.status = 'completed';
+            // Don't mark as completed - let kitchen mark it as served/completed
+            // Only mark as completed if order was already served
+            if (order.status === 'served') {
+                updates.status = 'completed';
+            }
         } else {
             paymentStatus = 'partially_paid';
         }
@@ -151,6 +155,78 @@ router.post('/pay', protect, async (req, res) => {
         res.json({ ...updatedOrder, _id: updatedOrder.id });
 
     } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+});
+
+// Upload Receipt PDF (store base64 and return download URL)
+router.post('/receipt-pdf', protect, async (req, res) => {
+    try {
+        const { orderId, pdfBase64, fileName } = req.body;
+        
+        if (!orderId || !pdfBase64) {
+            return res.status(400).json({ message: 'Order ID and PDF data required' });
+        }
+
+        // Get existing order to preserve billingDetails
+        const order = await prisma.order.findUnique({
+            where: { id: orderId },
+            select: { billingDetails: true }
+        });
+
+        const existingBilling = order?.billingDetails || {};
+        // Use FRONTEND_URL if available (for production), otherwise construct from request
+        const baseUrl = process.env.FRONTEND_URL 
+            ? process.env.FRONTEND_URL.replace(/\/$/, '')
+            : `${req.protocol}://${req.get('host')}`;
+        const pdfUrl = `${baseUrl}/api/billing/receipt/${orderId}/pdf`;
+        
+        // Store PDF base64 in order's billingDetails (temporary - in production use file storage like S3)
+        await prisma.order.update({
+            where: { id: orderId },
+            data: {
+                billingDetails: {
+                    ...existingBilling,
+                    pdfBase64: pdfBase64,
+                    pdfFileName: fileName
+                }
+            }
+        });
+
+        res.json({ pdfUrl, message: 'PDF uploaded successfully' });
+    } catch (error) {
+        console.error('[Receipt PDF] Error:', error);
+        res.status(500).json({ message: error.message });
+    }
+});
+
+// Download Receipt PDF (Public - no auth required for customer to download)
+router.get('/receipt/:orderId/pdf', async (req, res) => {
+    try {
+        const { orderId } = req.params;
+        const order = await prisma.order.findUnique({
+            where: { id: orderId },
+            select: { billingDetails: true, orderNumber: true }
+        });
+
+        if (!order) {
+            return res.status(404).json({ message: 'Order not found' });
+        }
+
+        const pdfBase64 = order.billingDetails?.pdfBase64;
+        if (!pdfBase64) {
+            return res.status(404).json({ message: 'PDF not found for this order' });
+        }
+
+        const pdfBuffer = Buffer.from(pdfBase64, 'base64');
+        const fileName = order.billingDetails?.pdfFileName || `Bill-${order.orderNumber}.pdf`;
+
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+        res.setHeader('Content-Length', pdfBuffer.length);
+        res.send(pdfBuffer);
+    } catch (error) {
+        console.error('[Receipt PDF Download] Error:', error);
         res.status(500).json({ message: error.message });
     }
 });

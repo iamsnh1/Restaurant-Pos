@@ -192,7 +192,11 @@ const api = {
         const res = await safeFetch(`${API_URL}/orders/kitchen`, {
             headers: getAuthHeader(),
         });
-        return res.json();
+        const data = await res.json();
+        if (!res.ok) {
+            throw new Error(data?.message || 'Failed to fetch kitchen orders');
+        }
+        return data;
     },
 
     // Tables
@@ -279,7 +283,9 @@ const api = {
             headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
             body: JSON.stringify(data),
         });
-        return res.json();
+        const out = await res.json();
+        if (!res.ok) throw new Error(out?.message || 'Failed to calculate bill');
+        return out;
     },
 
     processPayment: async (data) => {
@@ -288,7 +294,20 @@ const api = {
             headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
             body: JSON.stringify(data),
         });
-        return res.json();
+        const out = await res.json();
+        if (!res.ok) throw new Error(out?.message || 'Payment failed');
+        return out;
+    },
+
+    uploadReceiptPDF: async (data) => {
+        const res = await safeFetch(`${API_URL}/billing/receipt-pdf`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
+            body: JSON.stringify(data),
+        });
+        const out = await res.json();
+        if (!res.ok) throw new Error(out?.message || 'Failed to upload PDF');
+        return out;
     },
 };
 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import api from '../services/api';
+import api, { API_BASE } from '../services/api';
 import { X, CreditCard, Banknote, Smartphone, SplitSquareVertical, Printer, CheckCircle, MessageCircle, Share2, Check } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
@@ -74,18 +74,22 @@ const CheckoutModal = ({ order, isOpen, onClose, onPaymentComplete }) => {
         }
     }, [paymentMethod, splitParts, billData]);
 
+    const orderId = order?.id ?? order?._id;
+
     const calculateBill = async () => {
+        if (!orderId) return;
         try {
             setLoading(true);
             const res = await api.calculateBill({
-                orderId: order._id,
+                orderId,
                 discountType,
                 discountValue: parseFloat(discountValue) || 0
             });
             setBillData(res);
-            setLoading(false);
         } catch (error) {
-            console.error(error);
+            console.error('Calculate bill failed:', error);
+            setBillData(null);
+        } finally {
             setLoading(false);
         }
     };
@@ -99,27 +103,32 @@ const CheckoutModal = ({ order, isOpen, onClose, onPaymentComplete }) => {
     };
 
     const handleProcessPayment = async () => {
+        if (!orderId) {
+            alert('Order not found. Please try again.');
+            return;
+        }
+        if (!billData || billData.grandTotal == null) {
+            alert('Bill not calculated yet. Please wait or close and try again.');
+            return;
+        }
         setProcessing(true);
         try {
             if (paymentMethod === 'split') {
-                // Process each split sequentially for simulation
                 for (const part of splitPayments) {
                     if (part.status === 'pending') {
                         await api.processPayment({
-                            orderId: order._id,
+                            orderId,
                             paymentMethod: part.method,
                             amount: part.amount,
                             isFullPayment: false,
-                            billingDetails: billData // Send latest bill data
+                            billingDetails: billData
                         });
-                        // Update local state to show paid
                         setSplitPayments(prev => prev.map(p => p.id === part.id ? { ...p, status: 'paid' } : p));
                     }
                 }
             } else {
-                // Single Payment
                 await api.processPayment({
-                    orderId: order._id,
+                    orderId,
                     paymentMethod,
                     amount: billData.grandTotal,
                     isFullPayment: true,
@@ -131,12 +140,10 @@ const CheckoutModal = ({ order, isOpen, onClose, onPaymentComplete }) => {
                     }
                 });
             }
-
-            // Show Receipt View
             setView('receipt');
-
         } catch (error) {
-            alert('Payment Failed: ' + error.message);
+            const msg = error?.response?.data?.message || error?.message || 'Payment failed';
+            alert('Payment Failed: ' + msg);
         } finally {
             setProcessing(false);
         }
@@ -202,7 +209,8 @@ const CheckoutModal = ({ order, isOpen, onClose, onPaymentComplete }) => {
             pdf.text(`Order: ${order.orderNumber}`, leftMargin, y);
             pdf.text(`Date: ${new Date().toLocaleDateString()}`, rightMargin, y, { align: 'right' });
             y += 4.5;
-            pdf.text(`Type: ${order.orderType.toUpperCase()}`, leftMargin, y);
+            const orderTypeLabel = (order.orderType || '').replace(/_/g, ' ').toUpperCase();
+            pdf.text(`Type: ${orderTypeLabel}`, leftMargin, y);
             if (order.tableNumber) pdf.text(`Table: ${order.tableNumber}`, rightMargin, y, { align: 'right' });
             y += 6;
 
@@ -278,35 +286,66 @@ const CheckoutModal = ({ order, isOpen, onClose, onPaymentComplete }) => {
             pdf.setFont("helvetica", "italic");
             pdf.text("Generated via Voxxera POS", mid, y + 2, { align: 'center' });
 
-            // 1. Generate PDF Blob
-            const fileName = `Receipt-${order.orderNumber}.pdf`;
-            const pdfBlob = pdf.output('blob');
-            const file = new File([pdfBlob], fileName, { type: 'application/pdf' });
+            const fileName = `Bill-${order.orderNumber}.pdf`;
+            
+            // Convert PDF to base64
+            const pdfBase64 = pdf.output('base64');
 
-            // 2. Logic: Send Digital Receipt Link (Option 1)
+            // Upload PDF to backend and get shareable download URL
+            let pdfUrl = null;
+            try {
+                const uploadRes = await api.uploadReceiptPDF({
+                    orderId: orderId,
+                    pdfBase64: pdfBase64,
+                    fileName: fileName
+                });
+                pdfUrl = uploadRes.pdfUrl;
+                // Use API_BASE if backend returned relative URL
+                if (pdfUrl && !pdfUrl.startsWith('http')) {
+                    pdfUrl = `${API_BASE}${pdfUrl.startsWith('/') ? '' : '/'}${pdfUrl}`;
+                }
+            } catch (error) {
+                console.error('PDF upload failed:', error);
+                // Fallback: construct URL manually
+                pdfUrl = `${API_BASE}/api/billing/receipt/${orderId}/pdf`;
+            }
+
+            // Download PDF locally
+            pdf.save(fileName);
+
+            // Share via WhatsApp with PDF download link
             const phone = customerPhone.replace(/\D/g, '');
             if (phone && phone.length >= 10) {
-                const formattedPhone = phone.length === 10 ? `91${phone}` : phone;
+                const formattedPhone = phone.startsWith('0') ? `91${phone.slice(1)}` : (phone.length === 10 ? `91${phone}` : phone);
                 const restaurantName = settings?.restaurant?.name || 'Our Restaurant';
+                const thankYouText = settings?.receipt?.footer || 'Thank you for dining with us! We hope to see you again.';
 
-                // Construct the public receipt link
-                const receiptLink = `${window.location.origin}/receipt/${order._id}`;
+                let message = `Hi! 👋\n\n` +
+                    `*${restaurantName}*\n\n` +
+                    `Thank you for your order!\n\n` +
+                    `*Order:* ${order.orderNumber}\n` +
+                    `*Total:* ₹${billData.grandTotal.toFixed(2)}\n\n`;
+                
+                if (pdfUrl) {
+                    message += `📄 *Download your bill PDF:*\n${pdfUrl}\n\n`;
+                }
+                
+                message += `${thankYouText}`;
 
-                const message = `*Bill from ${restaurantName}*%0A%0A` +
-                    `*Order:* ${order.orderNumber}%0A` +
-                    `*Total: ₹${billData.grandTotal.toFixed(2)}*%0A%0A` +
-                    `View/Download your digital receipt here:%0A${receiptLink}%0A%0A` +
-                    `Thank you for dining with us!`;
-
-                window.open(`https://wa.me/${formattedPhone}?text=${message}`, '_blank');
+                const encodedMessage = encodeURIComponent(message);
+                setTimeout(() => {
+                    window.open(`https://wa.me/${formattedPhone}?text=${encodedMessage}`, '_blank');
+                }, 500);
             } else {
-                // FALLBACK: If no phone number is provided, download the PDF locally
-                pdf.save(fileName);
-                alert('No phone number entered. Digital receipt link unavailable. PDF downloaded instead.');
+                if (pdfUrl) {
+                    alert(`Bill PDF downloaded: ${fileName}\n\nPDF download link: ${pdfUrl}\n\nEnter customer phone number and click Share again to send via WhatsApp.`);
+                } else {
+                    alert(`Bill PDF downloaded: ${fileName}\n\nEnter customer phone number and click Share again to send via WhatsApp.`);
+                }
             }
         } catch (error) {
             console.error('Sharing failed:', error);
-            alert('Something went wrong. Please check the customer phone number.');
+            alert('Something went wrong. Please check the customer phone number and try again.');
         } finally {
             setIsGenerating(false);
         }
@@ -424,7 +463,8 @@ const CheckoutModal = ({ order, isOpen, onClose, onPaymentComplete }) => {
                     </div>
 
                     {/* Footer Actions */}
-                    <div className="p-3 sm:p-4 border-t bg-gray-50 flex flex-col sm:flex-row gap-2 print:hidden shrink-0">
+                    <div className="p-3 sm:p-4 border-t bg-gray-50 flex flex-col gap-2 print:hidden shrink-0">
+                        <div className="flex flex-col sm:flex-row gap-2">
                         <button
                             onClick={handleShareReceipt}
                             disabled={isGenerating}
@@ -435,7 +475,7 @@ const CheckoutModal = ({ order, isOpen, onClose, onPaymentComplete }) => {
                             ) : (
                                 <MessageCircle size={18} />
                             )}
-                            {isGenerating ? 'Generating...' : 'Share on WhatsApp'}
+                            {isGenerating ? 'Generating PDF...' : 'Share via WhatsApp'}
                         </button>
                         <div className="flex gap-2 flex-1">
                             <button
@@ -451,6 +491,7 @@ const CheckoutModal = ({ order, isOpen, onClose, onPaymentComplete }) => {
                             >
                                 Close
                             </button>
+                        </div>
                         </div>
                     </div>
                 </div>
@@ -598,16 +639,19 @@ const CheckoutModal = ({ order, isOpen, onClose, onPaymentComplete }) => {
                     </div>
 
                     <div className="mt-auto pt-6 border-t border-white/10">
+                        {!billData && !loading && (
+                            <p className="text-amber-400 text-sm mb-2">Could not load bill. Close and try again.</p>
+                        )}
                         <button
                             onClick={handleProcessPayment}
-                            disabled={processing || loading}
+                            disabled={processing || loading || !billData}
                             className="w-full bg-green-600 hover:bg-green-700 text-white py-4 rounded-xl font-bold text-lg shadow-xl shadow-green-900/20 flex items-center justify-center gap-3 disabled:opacity-50 transition-transform active:scale-95"
                         >
                             {processing ? (
                                 <div className="h-6 w-6 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                             ) : (
                                 <>
-                                    <span>Pay {paymentMethod === 'split' ? 'Total' : `₹${billData?.grandTotal?.toFixed(0)}`}</span>
+                                    <span>Pay {paymentMethod === 'split' ? 'Total' : (billData ? `₹${Number(billData.grandTotal).toFixed(0)}` : '—')}</span>
                                     <Check size={20} />
                                 </>
                             )}

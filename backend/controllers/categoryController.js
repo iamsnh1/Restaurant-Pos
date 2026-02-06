@@ -9,7 +9,9 @@ const getCategories = async (req, res) => {
             where: { isActive: true },
             orderBy: { order: 'asc' },
         });
-        res.json(categories);
+        // Map id to _id for frontend (POS expects _id)
+        const mapped = categories.map(c => ({ ...c, _id: c.id }));
+        res.json(mapped);
     } catch (error) {
         res.status(500).json({ message: error.message });
     }
@@ -29,7 +31,9 @@ const createCategory = async (req, res) => {
                 order: order ? parseInt(order) : 0,
             },
         });
-        res.status(201).json(category);
+        const io = req.app.get('io');
+        if (io) io.to('pos').emit('menuSync');
+        res.status(201).json({ ...category, _id: category.id });
     } catch (error) {
         res.status(400).json({ message: error.message });
     }
@@ -44,7 +48,9 @@ const updateCategory = async (req, res) => {
             where: { id: req.params.id },
             data: req.body,
         });
-        res.json(category);
+        const io = req.app.get('io');
+        if (io) io.to('pos').emit('menuSync');
+        res.json({ ...category, _id: category.id });
     } catch (error) {
         // Handle record not found
         if (error.code === 'P2025') {
@@ -62,6 +68,8 @@ const deleteCategory = async (req, res) => {
         await prisma.category.delete({
             where: { id: req.params.id },
         });
+        const io = req.app.get('io');
+        if (io) io.to('pos').emit('menuSync');
         res.json({ message: 'Category removed' });
     } catch (error) {
         if (error.code === 'P2025') {

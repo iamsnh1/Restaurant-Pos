@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import api, { API_BASE } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
@@ -32,10 +32,14 @@ const POSTerminal = () => {
     const [showCheckout, setShowCheckout] = useState(false);
     const [loading, setLoading] = useState(true);
     const [currentOrder, setCurrentOrder] = useState(null);
+    const selectedCategoryRef = useRef(selectedCategory);
+    selectedCategoryRef.current = selectedCategory;
 
-    // Socket for notifications
+    // Socket for notifications and menu sync
     useEffect(() => {
         const socket = io(API_BASE);
+
+        socket.emit('joinPOS');
 
         socket.on('orderStatusUpdate', (updatedOrder) => {
             if (updatedOrder.status === 'ready') {
@@ -46,6 +50,10 @@ const POSTerminal = () => {
                     });
                 }
             }
+        });
+
+        socket.on('menuSync', () => {
+            loadData(selectedCategoryRef.current);
         });
 
         return () => socket.disconnect();
@@ -61,12 +69,19 @@ const POSTerminal = () => {
         }
     }, [selectedCategory]);
 
-    const loadData = async () => {
+    const loadData = async (preserveCategoryId) => {
         try {
             const cats = await api.getCategories();
             setCategories(cats);
             if (cats.length > 0) {
-                setSelectedCategory(cats[0]._id);
+                const currentId = preserveCategoryId ?? (cats[0]._id ?? cats[0].id);
+                const exists = cats.some((c) => (c._id ?? c.id) === currentId);
+                const categoryId = exists ? currentId : (cats[0]._id ?? cats[0].id);
+                setSelectedCategory(categoryId);
+                const items = await api.getMenuItems(categoryId);
+                setMenuItems(items);
+            } else {
+                setMenuItems([]);
             }
             setLoading(false);
         } catch (error) {
@@ -201,18 +216,21 @@ const POSTerminal = () => {
                 <div className="flex-1 flex flex-col overflow-hidden h-full">
                     {/* Categories */}
                     <div className="p-4 flex gap-2 overflow-x-auto border-b border-white/10 shrink-0 scrollbar-hide">
-                        {categories.map((cat) => (
-                            <button
-                                key={cat._id}
-                                onClick={() => setSelectedCategory(cat._id)}
-                                className={`px-4 py-2 rounded-full whitespace-nowrap transition text-sm sm:text-base ${selectedCategory === cat._id
-                                    ? 'bg-purple-600 text-white'
-                                    : 'bg-white/10 text-purple-200 hover:bg-white/20'
-                                    }`}
-                            >
-                                {cat.name}
-                            </button>
-                        ))}
+                        {categories.map((cat) => {
+                            const catId = cat._id ?? cat.id;
+                            return (
+                                <button
+                                    key={catId}
+                                    onClick={() => setSelectedCategory(catId)}
+                                    className={`px-4 py-2 rounded-full whitespace-nowrap transition text-sm sm:text-base ${selectedCategory === catId
+                                        ? 'bg-purple-600 text-white'
+                                        : 'bg-white/10 text-purple-200 hover:bg-white/20'
+                                        }`}
+                                >
+                                    {cat.name}
+                                </button>
+                            );
+                        })}
                     </div>
 
                     {/* Menu Items Grid */}

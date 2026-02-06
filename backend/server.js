@@ -13,32 +13,24 @@ connectDB();
 const app = express();
 const server = http.createServer(app);
 
-// Production CORS - allow frontend URL from env
+// CORS - allow frontend URL from env
 const allowedOrigins = [
   'http://localhost:5173',
   'http://localhost:5174',
   'http://127.0.0.1:5173',
   'http://127.0.0.1:5174',
+  'http://localhost',
   process.env.FRONTEND_URL
 ].filter(Boolean);
 
-// In production, use regex to allow common hosting domains
 const corsOptions = {
-  origin: process.env.NODE_ENV === 'production'
-    ? (origin, callback) => {
-      if (!origin || allowedOrigins.includes(origin) ||
-        origin.endsWith('.vercel.app') ||
-        origin.endsWith('.netlify.app') ||
-        origin.endsWith('.trycloudflare.com') ||
-        origin.endsWith('.railway.app') ||
-        origin.endsWith('.render.com') ||
-        origin.endsWith('.fly.dev')) {
-        callback(null, true);
-      } else {
-        callback(null, true); // Allow all in production for now
-      }
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(null, true); // Allow all origins for development
     }
-    : true,
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
@@ -58,12 +50,13 @@ app.set('io', io);
 
 // Socket.io connection handling
 io.on('connection', (socket) => {
-  console.log('Client connected:', socket.id);
+  console.log(`[SOCKET] Client connected: ${socket.id}`);
 
   // Join kitchen room for KDS updates
   socket.on('joinKitchen', () => {
     socket.join('kitchen');
-    console.log(`${socket.id} joined kitchen room`);
+    const roomSize = io.sockets.adapter.rooms.get('kitchen')?.size || 0;
+    console.log(`[SOCKET] ${socket.id} joined kitchen room (${roomSize} clients in room)`);
   });
 
   // Join POS room for order updates
@@ -73,7 +66,7 @@ io.on('connection', (socket) => {
   });
 
   socket.on('disconnect', () => {
-    console.log('Client disconnected:', socket.id);
+    console.log(`[SOCKET] Client disconnected: ${socket.id}`);
   });
 });
 

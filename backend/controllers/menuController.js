@@ -73,6 +73,8 @@ const createMenuItem = async (req, res) => {
             include: { category: true }
         });
 
+        const io = req.app.get('io');
+        if (io) io.to('pos').emit('menuSync');
         res.status(201).json({ ...item, _id: item.id });
     } catch (error) {
         res.status(400).json({ message: error.message });
@@ -101,6 +103,8 @@ const updateMenuItem = async (req, res) => {
             data,
             include: { category: true }
         });
+        const io = req.app.get('io');
+        if (io) io.to('pos').emit('menuSync');
         res.json({ ...item, _id: item.id });
     } catch (error) {
         if (error.code === 'P2025') {
@@ -118,6 +122,8 @@ const deleteMenuItem = async (req, res) => {
         await prisma.menuItem.delete({
             where: { id: req.params.id },
         });
+        const io = req.app.get('io');
+        if (io) io.to('pos').emit('menuSync');
         res.json({ message: 'Menu item removed' });
     } catch (error) {
         if (error.code === 'P2025') {
