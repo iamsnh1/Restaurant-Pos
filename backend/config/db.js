@@ -9,15 +9,21 @@ if (!connectionString) {
 }
 
 // Configure SSL based on connection string
-// Local Docker PostgreSQL doesn't support SSL, so disable it for localhost/postgres connections
+// Supabase requires SSL, local Docker PostgreSQL doesn't support SSL
 const poolConfig = { connectionString };
 const isLocalDB = connectionString.includes('localhost') || 
                   connectionString.includes('127.0.0.1') || 
                   connectionString.includes('postgres:5432') ||
                   connectionString.includes('@postgres:');
+const isSupabase = connectionString.includes('.supabase.co');
 
-if (!isLocalDB) {
-    // For remote databases (DigitalOcean, Railway, etc.), use SSL if not already specified
+if (isSupabase) {
+    // Supabase requires SSL
+    if (!connectionString.includes('sslmode=')) {
+        poolConfig.ssl = { rejectUnauthorized: false }; // Supabase uses self-signed certs
+    }
+} else if (!isLocalDB) {
+    // For other remote databases (DigitalOcean, Railway, etc.), use SSL if not already specified
     if (!connectionString.includes('sslmode=')) {
         poolConfig.ssl = { rejectUnauthorized: true };
     }

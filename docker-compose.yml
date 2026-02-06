@@ -1,6 +1,8 @@
 version: '3.8'
 
 services:
+  # Local PostgreSQL (optional - only needed if not using Supabase)
+  # To use Supabase, set DATABASE_URL environment variable and remove this service
   postgres:
     image: postgres:15-alpine
     environment:
@@ -14,18 +16,22 @@ services:
       interval: 3s
       timeout: 3s
       retries: 5
+    profiles:
+      - local-db  # Only start if explicitly requested
 
   backend:
     build: ./backend
     environment:
       PORT: 5001
       NODE_ENV: production
-      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/restaurant-pos?schema=public
+      # Use Supabase if DATABASE_URL is set, otherwise use local PostgreSQL
+      DATABASE_URL: ${DATABASE_URL:-postgresql://postgres:postgres@postgres:5432/restaurant-pos?schema=public}
       JWT_SECRET: ${JWT_SECRET:-supersecretkey-change-in-production}
       FRONTEND_URL: http://localhost
     depends_on:
       postgres:
         condition: service_healthy
+        required: false  # Optional - only needed if using local PostgreSQL
     # Not exposed to host; only frontend (nginx) talks to backend
 
   frontend:
