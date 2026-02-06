@@ -47,28 +47,9 @@ COPY --from=backend-build /app/backend /app/backend
 # Copy nginx config for single container
 COPY nginx.prod.conf /etc/nginx/conf.d/default.conf
 
-# Create startup script
-RUN echo '#!/bin/sh' > /start.sh && \
-    echo 'cd /app/backend' >> /start.sh && \
-    echo 'if [ -z "$DATABASE_URL" ]; then' >> /start.sh && \
-    echo '  echo "ERROR: DATABASE_URL is not set"' >> /start.sh && \
-    echo '  exit 1' >> /start.sh && \
-    echo 'fi' >> /start.sh && \
-    echo 'retries=0' >> /start.sh && \
-    echo 'max_retries=30' >> /start.sh && \
-    echo 'until cd /app/backend && npx prisma db push --accept-data-loss; do' >> /start.sh && \
-    echo '  retries=$((retries + 1))' >> /start.sh && \
-    echo '  if [ "$retries" -ge "$max_retries" ]; then' >> /start.sh && \
-    echo '    echo "ERROR: Could not connect to database after $max_retries attempts"' >> /start.sh && \
-    echo '    exit 1' >> /start.sh && \
-    echo '  fi' >> /start.sh && \
-    echo '  echo "Waiting for database... retry $retries/$max_retries in 3s"' >> /start.sh && \
-    echo '  sleep 3' >> /start.sh && \
-    echo 'done' >> /start.sh && \
-    echo 'cd /app/backend && npx prisma db seed || true' >> /start.sh && \
-    echo 'cd /app/backend && node server.js &' >> /start.sh && \
-    echo 'nginx -g "daemon off;"' >> /start.sh && \
-    chmod +x /start.sh
+# Copy startup script (will be executed at runtime, not build time)
+COPY start.sh /start.sh
+RUN chmod +x /start.sh
 
 WORKDIR /app/backend
 
