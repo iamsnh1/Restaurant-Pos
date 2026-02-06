@@ -47,7 +47,7 @@ services:
 databases:
   - name: posdb
     engine: PG
-    version: "15"
+    version: "16"
     production: false
 
 ingress:
